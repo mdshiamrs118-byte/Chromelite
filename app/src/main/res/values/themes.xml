@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- DayNight follows the system setting; colors switch via values-night/colors.xml -->
+    <style name="Theme.ChromeLite" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/chrome_accent</item>
+        <item name="colorPrimaryVariant">@color/chrome_accent</item>
+        <item name="colorOnPrimary">@color/chrome_on_accent</item>
+        <item name="colorSecondary">@color/chrome_accent</item>
+        <item name="colorSecondaryVariant">@color/chrome_accent</item>
+        <item name="colorOnSecondary">@color/chrome_on_accent</item>
+
+        <item name="android:colorBackground">@color/chrome_background</item>
+        <item name="colorSurface">@color/chrome_toolbar</item>
+        <item name="colorOnSurface">@color/chrome_text_primary</item>
+        <item name="colorOnBackground">@color/chrome_text_primary</item>
+        <item name="android:windowBackground">@color/chrome_background</item>
+
+        <item name="android:statusBarColor">@color/chrome_toolbar</item>
+        <item name="android:navigationBarColor">@color/chrome_toolbar</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+
+        <item name="android:textColorPrimary">@color/chrome_text_primary</item>
+        <item name="android:textColorSecondary">@color/chrome_text_secondary</item>
+        <item name="android:textColorHint">@color/chrome_text_secondary</item>
+    </style>
+
+</resources>

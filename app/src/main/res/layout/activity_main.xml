@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Root is focusableInTouchMode so the omnibox can release focus (clearFocus) and
+    does not grab focus / pop up the keyboard on launch.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/chrome_background"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:orientation="vertical">
+
+    <!-- ===== Chrome-style top toolbar ===== -->
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/chrome_toolbar"
+        android:elevation="4dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp">
+
+            <!-- Omnibox: padlock + URL/title field + clear/stop/reload -->
+            <LinearLayout
+                android:id="@+id/omnibox"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_omnibox"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="4dp">
+
+                <ImageView
+                    android:id="@+id/iv_security"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_search" />
+
+                <EditText
+                    android:id="@+id/et_omnibox"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:ellipsize="end"
+                    android:hint="@string/omnibox_hint"
+                    android:imeOptions="actionGo|flagNoExtractUi"
+                    android:importantForAutofill="no"
+                    android:inputType="textUri"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="4dp"
+                    android:selectAllOnFocus="true"
+                    android:textColor="@color/chrome_text_primary"
+                    android:textSize="15sp" />
+
+                <ImageButton
+                    android:id="@+id/btn_omnibox_action"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/cd_reload"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_refresh"
+                    app:tint="@color/chrome_text_secondary" />
+            </LinearLayout>
+
+            <!-- Tab / pane counter -->
+            <FrameLayout
+                android:id="@+id/btn_tabs"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/cd_tabs"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/tv_tab_count"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_tab_counter"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/chrome_text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:ignore="HardcodedText"
+                    xmlns:tools="http://schemas.android.com/tools" />
+            </FrameLayout>
+
+            <!-- Overflow menu -->
+            <ImageButton
+                android:id="@+id/btn_menu"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/cd_more"
+                android:src="@drawable/ic_more_vert"
+                app:tint="@color/chrome_text_primary" />
+        </LinearLayout>
+
+        <!-- Page load progress (shows progress of the active pane) -->
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:visibility="invisible"
+            app:indicatorColor="@color/chrome_progress"
+            app:trackColor="@android:color/transparent"
+            app:trackThickness="2dp" />
+    </LinearLayout>
+
+    <!--
+        ===== Split container =====
+        Orientation / sizes are switched in code (side by side <-> top & bottom).
+        Pane B and the divider stay GONE until split view is enabled.
+        WebViews are added to the pane containers at index 0 (below the indicator).
+    -->
+    <LinearLayout
+        android:id="@+id/split_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/pane_a_container"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <View
+                android:id="@+id/indicator_a"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_gravity="top"
+                android:background="@color/chrome_accent"
+                android:visibility="invisible" />
+        </FrameLayout>
+
+        <View
+            android:id="@+id/split_divider"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/chrome_divider"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/pane_b_container"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/indicator_b"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_gravity="top"
+                android:background="@color/chrome_accent"
+                android:visibility="invisible" />
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

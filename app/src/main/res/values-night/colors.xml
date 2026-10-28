@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark palette (Chrome-inspired) -->
+    <color name="chrome_toolbar">#202124</color>
+    <color name="chrome_background">#202124</color>
+    <color name="chrome_omnibox_bg">#35363A</color>
+    <color name="chrome_text_primary">#E8EAED</color>
+    <color name="chrome_text_secondary">#9AA0A6</color>
+    <color name="chrome_divider">#3C4043</color>
+    <color name="chrome_accent">#8AB4F8</color>
+    <color name="chrome_on_accent">#202124</color>
+    <color name="chrome_secure">#81C995</color>
+    <color name="chrome_insecure">#F28B82</color>
+    <color name="chrome_progress">#8AB4F8</color>
+</resources>

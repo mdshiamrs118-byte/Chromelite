@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Also used as the name of the app-specific download folder -->
+    <string name="app_name">ChromeLite</string>
+
+    <!-- Omnibox -->
+    <string name="omnibox_hint">Search or type web address</string>
+    <string name="cd_security_secure">Secure connection</string>
+    <string name="cd_security_insecure">Not secure</string>
+    <string name="cd_search">Search</string>
+    <string name="cd_clear">Clear</string>
+    <string name="cd_stop">Stop loading</string>
+    <string name="cd_reload">Reload</string>
+    <string name="cd_tabs">Open pages</string>
+    <string name="cd_more">More options</string>
+
+    <!-- Overflow menu -->
+    <string name="menu_forward">Forward</string>
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_split_view">Split view</string>
+    <string name="menu_share">Share link</string>
+    <string name="menu_find">Find in page</string>
+    <string name="menu_desktop_site">Desktop site</string>
+    <string name="menu_bookmarks">Bookmarks</string>
+    <string name="menu_history">History</string>
+    <string name="menu_downloads">Downloads</string>
+    <string name="menu_clear_data">Clear browsing data</string>
+    <string name="menu_settings">Settings</string>
+    <string name="split_layout_side">Layout: side by side</string>
+    <string name="split_layout_stacked">Layout: top &amp; bottom</string>
+
+    <!-- Pane switcher (tab counter popup) -->
+    <string name="pane_open_split">Open split view</string>
+    <string name="pane_close_split">Close split view</string>
+    <string name="pane_untitled">New page</string>
+
+    <!-- Placeholders for features added in later steps -->
+    <string name="coming_in_step">%1$s arrives in Step %2$d</string>
+</resources>
