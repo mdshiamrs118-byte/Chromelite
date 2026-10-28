@@ -34,6 +34,29 @@
     <string name="pane_close_split">Close split view</string>
     <string name="pane_untitled">New page</string>
 
+    <!-- Profiles -->
+    <string name="cd_profile">Switch profile</string>
+    <string name="menu_profile">Profile: %1$s</string>
+    <string name="profile_auto_name">Profile 2</string>
+    <string name="profiles_switch_title">Browse as</string>
+    <string name="profiles_new">New profile</string>
+    <string name="profiles_manage">Manage</string>
+    <string name="profiles_rename">Rename</string>
+    <string name="profiles_clear">Clear data</string>
+    <string name="profiles_delete">Delete</string>
+    <string name="profiles_name_hint">Profile name</string>
+    <string name="profiles_create_failed">Could not create the profile</string>
+    <string name="profiles_clear_title">Clear data of \"%1$s\"?</string>
+    <string name="profiles_clear_message">Signs you out of every site and removes cookies, site storage and cached files for this profile only. Other profiles are not touched.</string>
+    <string name="profiles_cleared">Profile data cleared</string>
+    <string name="profiles_delete_title">Delete \"%1$s\"?</string>
+    <string name="profiles_delete_message">Permanently removes this profile with all of its logins, cookies and site data.</string>
+    <string name="profiles_delete_in_use">This profile is open in a pane. Switch that pane to another profile first.</string>
+    <string name="profiles_delete_failed">Could not delete the profile</string>
+    <string name="profiles_unavailable_title">Separate profiles unavailable</string>
+    <string name="profiles_unavailable_message">Isolated profiles need a newer Android System WebView. Update \"Android System WebView\" (and Chrome) in the Play Store, then restart the app. Until then every page shares one session.</string>
+    <string name="profiles_split_shared_notice">Both panes share one session. Update Android System WebView for separate profiles.</string>
+
     <!-- Placeholders for features added in later steps -->
     <string name="coming_in_step">%1$s arrives in Step %2$d</string>
 </resources>

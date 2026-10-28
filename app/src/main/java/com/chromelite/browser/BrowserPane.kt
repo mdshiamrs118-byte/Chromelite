@@ -19,11 +19,13 @@ import android.webkit.WebViewClient
  * One browsing surface: a WebView plus the state the toolbar needs (url, title, progress, security).
  * The activity owns one pane normally and two when split view is on.
  *
- * Step 3 will replace how [webView] is created so each pane can run in an isolated profile.
+ * The WebView is bound to an isolated profile ([profileId]) by MainActivity before it gets here.
  */
 class BrowserPane(
     val webView: WebView,
     val indicator: View,
+    /** Profile this WebView was bound to (fixed for the life of the WebView). */
+    val profileId: String,
     private val listener: Listener
 ) {
 

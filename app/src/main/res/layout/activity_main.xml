@@ -77,6 +77,22 @@
                     app:tint="@color/chrome_text_secondary" />
             </LinearLayout>
 
+            <!-- Profile badge: initial of the active pane's profile, in the profile's color -->
+            <TextView
+                android:id="@+id/tv_profile"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/bg_profile_badge"
+                android:clickable="true"
+                android:contentDescription="@string/cd_profile"
+                android:focusable="true"
+                android:gravity="center"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
             <!-- Tab / pane counter -->
             <FrameLayout
                 android:id="@+id/btn_tabs"

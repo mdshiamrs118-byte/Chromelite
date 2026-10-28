@@ -19,15 +19,18 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.core.widget.doAfterTextChanged
 import com.chromelite.browser.databinding.ActivityMainBinding
 import com.google.android.material.snackbar.Snackbar
 
-class MainActivity : AppCompatActivity(), BrowserPane.Listener {
+class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.Host {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: SharedPreferences
+    private lateinit var profiles: ProfileManager
+    private lateinit var profileDialogs: ProfileDialogs
 
     private lateinit var paneA: BrowserPane
     private var paneB: BrowserPane? = null
@@ -44,10 +47,16 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         setContentView(binding.root)
 
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        profiles = ProfileManager.get(this)
+        profileDialogs = ProfileDialogs(this, profiles, this)
+
         splitEnabled = prefs.getBoolean(KEY_SPLIT, false)
         splitStacked = prefs.getBoolean(KEY_STACKED, false)
 
-        paneA = createPane(binding.paneAContainer, binding.indicatorA)
+        paneA = createPane(
+            binding.paneAContainer, binding.indicatorA,
+            profiles.resolve(prefs.getString(KEY_PROFILE_A, null)).id
+        )
         activePane = paneA
         paneA.load(webUrlFrom(intent) ?: prefs.getString(KEY_URL_A, null) ?: UrlUtils.HOME)
         if (splitEnabled) ensurePaneB()
@@ -73,6 +82,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
 
     override fun onPause() {
         saveState()
+        // Persist every profile's cookies so a killed process does not lose the logins.
+        listOfNotNull(paneA, paneB).map { it.profileId }.distinct().forEach { profiles.flush(it) }
         paneA.onPause()
         paneB?.onPause()
         super.onPause()
@@ -88,6 +99,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         val editor = prefs.edit()
         paneA.url.takeIf { it.isNotBlank() }?.let { editor.putString(KEY_URL_A, it) }
         paneB?.url?.takeIf { it.isNotBlank() }?.let { editor.putString(KEY_URL_B, it) }
+        editor.putString(KEY_PROFILE_A, paneA.profileId)
+        paneB?.let { editor.putString(KEY_PROFILE_B, it.profileId) }
         editor.apply()
     }
 
@@ -96,19 +109,48 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
 
     // ---------------------------------------------------------------- panes / split view
 
-    private fun createPane(container: FrameLayout, indicator: View): BrowserPane {
+    /**
+     * Builds a WebView bound to [profileId]. The profile has to be attached before the WebView
+     * is configured or loads anything; if it cannot be applied the pane honestly reports the
+     * default profile instead.
+     */
+    private fun createPane(container: FrameLayout, indicator: View, profileId: String): BrowserPane {
         val webView = WebView(this)
+        val boundTo = if (profiles.attach(webView, profileId)) profileId else profiles.default.id
+
         container.addView(
             webView, 0,
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
-        return BrowserPane(webView, indicator, this)
+        // Third-party cookies are needed by many sign-in flows (embedded OAuth frames).
+        profiles.cookieManager(boundTo).setAcceptThirdPartyCookies(webView, true)
+
+        return BrowserPane(webView, indicator, boundTo, this)
     }
 
-    /** Pane B is created lazily the first time split view is turned on. */
-    private fun ensurePaneB(): BrowserPane = paneB ?: createPane(binding.paneBContainer, binding.indicatorB).also {
-        paneB = it
-        it.load(prefs.getString(KEY_URL_B, null) ?: UrlUtils.HOME)
+    /**
+     * Pane B is created lazily the first time split view is turned on. It starts in a different
+     * profile than pane A (creating one if needed) so two accounts can be used straight away.
+     */
+    private fun ensurePaneB(): BrowserPane {
+        paneB?.let { return it }
+
+        val stored = prefs.getString(KEY_PROFILE_B, null)
+        val profileId = when {
+            stored != null && profiles.exists(stored) -> stored
+            else -> profiles.all().firstOrNull { it.id != paneA.profileId }?.id
+                ?: profiles.create(getString(R.string.profile_auto_name))?.id
+                ?: paneA.profileId
+        }
+
+        val pane = createPane(binding.paneBContainer, binding.indicatorB, profileId)
+        paneB = pane
+        pane.load(prefs.getString(KEY_URL_B, null) ?: UrlUtils.HOME)
+
+        if (pane.profileId == paneA.profileId && !profiles.isSupported) {
+            Snackbar.make(binding.root, R.string.profiles_split_shared_notice, Snackbar.LENGTH_LONG).show()
+        }
+        return pane
     }
 
     private fun setSplit(enabled: Boolean) {
@@ -134,6 +176,30 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
     private fun setActive(pane: BrowserPane) {
         if (pane === activePane) return
         activePane = pane
+        render()
+    }
+
+    /**
+     * A WebView cannot change profile once it exists, so switching means replacing the pane's
+     * WebView with a fresh one (new, empty session) that opens the same address.
+     */
+    private fun switchProfile(pane: BrowserPane, profileId: String) {
+        if (pane.profileId == profileId) return
+
+        val isA = pane === paneA
+        val container = if (isA) binding.paneAContainer else binding.paneBContainer
+        val indicator = if (isA) binding.indicatorA else binding.indicatorB
+        val wasActive = pane === activePane
+        val address = pane.url.ifBlank { UrlUtils.HOME }
+        val wasLoadable = UrlUtils.isWebUrl(address)
+
+        pane.destroy()
+        val fresh = createPane(container, indicator, profileId)
+        if (isA) paneA = fresh else paneB = fresh
+        if (wasActive) activePane = fresh
+        fresh.load(if (wasLoadable) address else UrlUtils.HOME)
+
+        saveState()
         render()
     }
 
@@ -173,6 +239,30 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         if (pane === activePane) render()
     }
 
+    // ---------------------------------------------------------------- ProfileDialogs.Host
+
+    override fun currentProfileId(): String = activePane.profileId
+
+    override fun profileIdsInUse(): Set<String> =
+        listOfNotNull(paneA, if (splitEnabled) paneB else null).map { it.profileId }.toSet()
+
+    override fun webViewFor(profileId: String): WebView? =
+        listOfNotNull(paneA, paneB).firstOrNull { it.profileId == profileId }?.webView
+
+    override fun switchCurrentPane(profileId: String) = switchProfile(activePane, profileId)
+
+    /** The hidden pane B (split view off) may still hold a profile; drop it so it can be deleted. */
+    override fun releaseHiddenPane(profileId: String) {
+        val hidden = paneB ?: return
+        if (!splitEnabled && hidden.profileId == profileId) {
+            hidden.destroy()
+            paneB = null
+            prefs.edit().remove(KEY_PROFILE_B).remove(KEY_URL_B).apply()
+        }
+    }
+
+    override fun profilesChanged() = render()
+
     // ---------------------------------------------------------------- toolbar / omnibox
 
     private fun setupOmnibox() = with(binding) {
@@ -210,6 +300,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
     }
 
     private fun setupToolbar() {
+        binding.tvProfile.setOnClickListener { profileDialogs.showSwitcher() }
         binding.btnTabs.setOnClickListener { showPaneMenu(it) }
         binding.btnMenu.setOnClickListener { showOverflowMenu(it) }
     }
@@ -266,11 +357,22 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         progress.setProgressCompat(pane.progress, true)
 
         renderActionButton()
+        renderProfile()
 
         tvTabCount.text = if (splitEnabled) "2" else "1"
 
         indicatorA.visibility = if (splitEnabled && pane === paneA) View.VISIBLE else View.INVISIBLE
         indicatorB.visibility = if (splitEnabled && pane === paneB) View.VISIBLE else View.INVISIBLE
+    }
+
+    /** Profile badge in the toolbar and the colored active-pane line, both in the profile's color. */
+    private fun renderProfile() = with(binding) {
+        val profile = profiles.resolve(activePane.profileId)
+        tvProfile.text = profile.initial
+        ViewCompat.setBackgroundTintList(tvProfile, ColorStateList.valueOf(profile.color))
+
+        indicatorA.setBackgroundColor(profiles.resolve(paneA.profileId).color)
+        paneB?.let { indicatorB.setBackgroundColor(profiles.resolve(it.profileId).color) }
     }
 
     /** Clear (while typing) / stop (while loading) / reload. */
@@ -302,7 +404,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
             val label = pane.title.ifBlank { UrlUtils.host(pane.url) }
                 .ifBlank { getString(R.string.pane_untitled) }
                 .take(32)
-            popup.menu.add(0, index, index, "${index + 1}  $label").apply {
+            val profileName = profiles.resolve(pane.profileId).name
+            popup.menu.add(0, index, index, "${index + 1}  $label  ·  $profileName").apply {
                 isCheckable = true
                 isChecked = pane === activePane
             }
@@ -325,6 +428,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         val popup = PopupMenu(this, anchor, Gravity.END)
         popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
 
+        popup.menu.findItem(R.id.action_profile).title =
+            getString(R.string.menu_profile, profiles.resolve(activePane.profileId).name)
         popup.menu.findItem(R.id.action_forward).isEnabled = activePane.webView.canGoForward()
         popup.menu.findItem(R.id.action_split).isChecked = splitEnabled
         popup.menu.findItem(R.id.action_split_orientation).apply {
@@ -338,6 +443,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
 
     private fun onMenuItem(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.action_profile -> profileDialogs.showSwitcher()
             R.id.action_forward -> activePane.webView.goForward()
             R.id.action_refresh -> activePane.reload()
             R.id.action_split -> setSplit(!splitEnabled)
@@ -376,6 +482,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener {
         const val KEY_STACKED = "split_stacked"
         const val KEY_URL_A = "url_a"
         const val KEY_URL_B = "url_b"
+        const val KEY_PROFILE_A = "profile_a"
+        const val KEY_PROFILE_B = "profile_b"
         const val ID_TOGGLE_SPLIT = 100
     }
 }

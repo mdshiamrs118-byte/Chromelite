@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace 'com.chromelite.browser'
-    compileSdk 33
+    compileSdk 34         // required by androidx.webkit 1.12 (runtime target stays 29)
 
     defaultConfig {
         applicationId "com.chromelite.browser"
@@ -47,7 +47,8 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.recyclerview:recyclerview:1.3.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    implementation 'androidx.webkit:webkit:1.7.0'
+    // 1.12.x: Profile API (isolated cookies/storage/cache per profile); still supports minSdk 21 (1.15+ needs 23)
+    implementation 'androidx.webkit:webkit:1.12.1'
     implementation 'androidx.activity:activity-ktx:1.7.2'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1'
