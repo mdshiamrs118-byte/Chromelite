@@ -5,6 +5,7 @@
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -13,39 +14,39 @@
     android:focusableInTouchMode="true"
     android:orientation="vertical">
 
-    <!-- ===== Chrome-style top toolbar ===== -->
+    <!-- ===== Chrome-style top toolbar (slim) ===== -->
     <LinearLayout
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/chrome_toolbar"
-        android:elevation="4dp"
+        android:elevation="2dp"
         android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="44dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingEnd="4dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="2dp">
 
             <!-- Omnibox: padlock + URL/title field + clear/stop/reload -->
             <LinearLayout
                 android:id="@+id/omnibox"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="34dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_omnibox"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="4dp">
+                android:paddingStart="10dp"
+                android:paddingEnd="2dp">
 
                 <ImageView
                     android:id="@+id/iv_security"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:src="@drawable/ic_search" />
 
                 <EditText
@@ -60,46 +61,45 @@
                     android:importantForAutofill="no"
                     android:inputType="textUri"
                     android:maxLines="1"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="4dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="2dp"
                     android:selectAllOnFocus="true"
                     android:textColor="@color/chrome_text_primary"
-                    android:textSize="15sp" />
+                    android:textSize="14sp" />
 
                 <ImageButton
                     android:id="@+id/btn_omnibox_action"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/cd_reload"
-                    android:padding="8dp"
+                    android:padding="7dp"
                     android:src="@drawable/ic_refresh"
                     app:tint="@color/chrome_text_secondary" />
-
 
             </LinearLayout>
 
             <!-- Profile badge: initial of the active pane's profile, in the profile's color -->
             <TextView
                 android:id="@+id/tv_profile"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
-                android:layout_marginEnd="2dp"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="0dp"
                 android:background="@drawable/bg_profile_badge"
                 android:clickable="true"
                 android:contentDescription="@string/cd_profile"
                 android:focusable="true"
                 android:gravity="center"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <!-- Tab / pane counter -->
             <FrameLayout
                 android:id="@+id/btn_tabs"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:contentDescription="@string/cd_tabs"
@@ -107,24 +107,23 @@
 
                 <TextView
                     android:id="@+id/tv_tab_count"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_tab_counter"
                     android:gravity="center"
                     android:text="1"
                     android:textColor="@color/chrome_text_primary"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:textStyle="bold"
-                    tools:ignore="HardcodedText"
-                    xmlns:tools="http://schemas.android.com/tools" />
+                    tools:ignore="HardcodedText" />
             </FrameLayout>
 
             <!-- Overflow menu -->
             <ImageButton
                 android:id="@+id/btn_menu"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/cd_more"
                 android:src="@drawable/ic_more_vert"
@@ -142,36 +141,19 @@
             app:trackColor="@android:color/transparent"
             app:trackThickness="2dp" />
 
-
     </LinearLayout>
-
-    <!-- Toggle button - under toolbar on right side -->
-    <ImageButton
-        android:id="@+id/btn_toolbar_toggle"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_gravity="end"
-        android:layout_marginEnd="6dp"
-        android:layout_marginTop="6dp"
-        android:alpha="0.9"
-        android:background="@drawable/bg_toolbar_toggle"
-        android:contentDescription="@string/cd_hide_toolbar"
-        android:elevation="6dp"
-        android:padding="4dp"
-        android:src="@drawable/ic_arrow_up"
-        app:tint="@color/chrome_text_primary" />
 
     <!-- ===== Find in page (hidden until opened from the menu) ===== -->
     <LinearLayout
         android:id="@+id/find_bar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="44dp"
         android:background="@color/chrome_toolbar"
-        android:elevation="3dp"
+        android:elevation="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"
-        android:paddingEnd="4dp"
+        android:paddingEnd="2dp"
         android:visibility="gone">
 
         <EditText
@@ -186,7 +168,7 @@
             android:inputType="text"
             android:maxLines="1"
             android:textColor="@color/chrome_text_primary"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/tv_find_count"
@@ -199,8 +181,8 @@
 
         <ImageButton
             android:id="@+id/btn_find_prev"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/find_previous"
             android:src="@drawable/ic_arrow_up"
@@ -208,8 +190,8 @@
 
         <ImageButton
             android:id="@+id/btn_find_next"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/find_next"
             android:src="@drawable/ic_arrow_down"
@@ -217,8 +199,8 @@
 
         <ImageButton
             android:id="@+id/btn_find_close"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/find_close"
             android:src="@drawable/ic_close"
@@ -226,54 +208,80 @@
     </LinearLayout>
 
     <!--
-        ===== Split container =====
-        Orientation / sizes are switched in code (side by side <-> top & bottom).
-        Pane B and the divider stay GONE until split view is enabled.
-        WebViews are added to the pane containers at index 0 (below the indicator).
+        ===== Content area =====
+        The split container fills it. The show/hide-toolbar button floats over its top-left
+        corner, so it sits right under the toolbar without taking a row of its own, and it
+        stays reachable when the toolbar is hidden.
     -->
-    <LinearLayout
-        android:id="@+id/split_container"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
+        android:layout_weight="1">
 
-        <FrameLayout
-            android:id="@+id/pane_a_container"
-            android:layout_width="0dp"
+        <!--
+            Split container: orientation / sizes are switched in code (side by side <-> top & bottom).
+            Pane B and the divider stay GONE until split view is enabled.
+            WebViews are added to the pane containers at index 0 (below the indicator).
+        -->
+        <LinearLayout
+            android:id="@+id/split_container"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1">
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:id="@+id/pane_a_container"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <View
+                    android:id="@+id/indicator_a"
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:layout_gravity="top"
+                    android:background="@color/chrome_accent"
+                    android:visibility="invisible" />
+            </FrameLayout>
 
             <View
-                android:id="@+id/indicator_a"
-                android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:layout_gravity="top"
-                android:background="@color/chrome_accent"
-                android:visibility="invisible" />
-        </FrameLayout>
+                android:id="@+id/split_divider"
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="@color/chrome_divider"
+                android:visibility="gone" />
 
-        <View
-            android:id="@+id/split_divider"
-            android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="@color/chrome_divider"
-            android:visibility="gone" />
+            <FrameLayout
+                android:id="@+id/pane_b_container"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:visibility="gone">
 
-        <FrameLayout
-            android:id="@+id/pane_b_container"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:visibility="gone">
+                <View
+                    android:id="@+id/indicator_b"
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:layout_gravity="top"
+                    android:background="@color/chrome_accent"
+                    android:visibility="invisible" />
+            </FrameLayout>
+        </LinearLayout>
 
-            <View
-                android:id="@+id/indicator_b"
-                android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:layout_gravity="top"
-                android:background="@color/chrome_accent"
-                android:visibility="invisible" />
-        </FrameLayout>
-    </LinearLayout>
+        <!-- Show / hide toolbar: small button under the toolbar, on the left -->
+        <ImageButton
+            android:id="@+id/btn_toolbar_toggle"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="6dp"
+            android:layout_marginTop="6dp"
+            android:alpha="0.9"
+            android:background="@drawable/bg_toolbar_toggle"
+            android:contentDescription="@string/cd_hide_toolbar"
+            android:elevation="6dp"
+            android:padding="4dp"
+            android:src="@drawable/ic_arrow_up"
+            app:tint="@color/chrome_text_primary" />
+    </FrameLayout>
 </LinearLayout>
