@@ -75,6 +75,8 @@
                     android:padding="8dp"
                     android:src="@drawable/ic_refresh"
                     app:tint="@color/chrome_text_secondary" />
+
+
             </LinearLayout>
 
             <!-- Profile badge: initial of the active pane's profile, in the profile's color -->
@@ -139,7 +141,22 @@
             app:indicatorColor="@color/chrome_progress"
             app:trackColor="@android:color/transparent"
             app:trackThickness="2dp" />
+
+
     </LinearLayout>
+
+    <!-- Toggle button - under toolbar on right side -->
+    <ImageButton
+        android:id="@+id/btn_toolbar_toggle"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="end"
+        android:layout_margin="4dp"
+        android:background="@color/chrome_toolbar"
+        android:contentDescription="@string/cd_hide_toolbar"
+        android:elevation="4dp"
+        android:src="@drawable/ic_arrow_up"
+        app:tint="@color/chrome_text_primary" />
 
     <!-- ===== Find in page (hidden until opened from the menu) ===== -->
     <LinearLayout

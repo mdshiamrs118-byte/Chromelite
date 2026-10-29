@@ -524,6 +524,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         binding.tvProfile.setOnClickListener { profileDialogs.showSwitcher() }
         binding.btnTabs.setOnClickListener { tabSwitcher.show() }
         binding.btnMenu.setOnClickListener { showOverflowMenu(it) }
+        binding.btnToolbarToggle.setOnClickListener { toggleToolbarVisibility() }
     }
 
     private fun navigate(input: String) {
@@ -616,6 +617,14 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun hideKeyboard(view: View) {
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(view.windowToken, 0)
+    }
+
+    private fun toggleToolbarVisibility() = with(binding) {
+        val isVisible = toolbar.visibility == View.VISIBLE
+        toolbar.visibility = if (isVisible) View.GONE else View.VISIBLE
+        btnToolbarToggle.setImageResource(
+            if (isVisible) R.drawable.ic_arrow_down else R.drawable.ic_arrow_up
+        )
     }
 
     // ---------------------------------------------------------------- menus
