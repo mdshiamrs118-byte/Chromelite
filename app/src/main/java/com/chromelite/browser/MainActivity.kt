@@ -6,7 +6,11 @@ import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
+import android.annotation.SuppressLint
+import android.view.GestureDetector
+import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -74,6 +78,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     private var splitEnabled = false
     private var splitStacked = false // false = side by side, true = top & bottom
+    private var splitRatio = 0.5f // share of the split area given to pane A
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -94,11 +99,13 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         tabSwitcher = TabSwitcher(this, profiles, this)
 
         splitStacked = prefs.getBoolean(KEY_STACKED, false)
+        splitRatio = prefs.getFloat(KEY_RATIO, 0.5f).coerceIn(MIN_RATIO, 1f - MIN_RATIO)
         restoreTabs()
 
         setupOmnibox()
         setupToolbar()
         setupFindBar()
+        setupSplitDivider()
         setupBackNavigation()
         applySplitLayout()
         render()
@@ -380,30 +387,79 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         render()
     }
 
-    /** Applies orientation, 50/50 weights and divider direction for the current split state. */
+    /** Applies orientation, pane weights and divider direction for the current split state. */
     private fun applySplitLayout() = with(binding) {
         val matchParent = ViewGroup.LayoutParams.MATCH_PARENT
-        val line = maxOf(1, dp(1))
+        val bar = dp(DIVIDER_DP)
 
         splitContainer.orientation = if (splitStacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
 
-        val paneParams = {
+        val paneParams = { weight: Float ->
             LinearLayout.LayoutParams(
                 if (splitStacked) matchParent else 0,
                 if (splitStacked) 0 else matchParent,
-                1f
+                weight
             )
         }
-        paneAContainer.layoutParams = paneParams()
-        paneBContainer.layoutParams = paneParams()
+        paneAContainer.layoutParams = paneParams(splitRatio)
+        paneBContainer.layoutParams = paneParams(1f - splitRatio)
         splitDivider.layoutParams = LinearLayout.LayoutParams(
-            if (splitStacked) matchParent else line,
-            if (splitStacked) line else matchParent
+            if (splitStacked) matchParent else bar,
+            if (splitStacked) bar else matchParent
+        )
+        // The grip is a short pill across the narrow direction of the divider.
+        splitHandle.layoutParams = FrameLayout.LayoutParams(
+            if (splitStacked) dp(36) else dp(4),
+            if (splitStacked) dp(4) else dp(36),
+            Gravity.CENTER
         )
 
         val visibility = if (splitEnabled) View.VISIBLE else View.GONE
         paneBContainer.visibility = visibility
         splitDivider.visibility = visibility
+    }
+
+    /** Drag the divider to resize the panes; double-tap it to go back to an even split. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupSplitDivider() {
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                setSplitRatio(0.5f)
+                saveSplitRatio()
+                return true
+            }
+        })
+        binding.splitDivider.setOnTouchListener { view, event ->
+            detector.onTouchEvent(event)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> view.parent.requestDisallowInterceptTouchEvent(true)
+                MotionEvent.ACTION_MOVE -> dragSplitTo(event.rawX, event.rawY)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> saveSplitRatio()
+            }
+            true
+        }
+    }
+
+    private fun dragSplitTo(rawX: Float, rawY: Float) {
+        val container = binding.splitContainer
+        val divider = binding.splitDivider
+        val origin = IntArray(2).also { container.getLocationOnScreen(it) }
+        val barSize = if (splitStacked) divider.height else divider.width
+        val usable = (if (splitStacked) container.height else container.width) - barSize
+        if (usable <= 0) return
+        val position = (if (splitStacked) rawY - origin[1] else rawX - origin[0]) - barSize / 2f
+        setSplitRatio(position / usable)
+    }
+
+    private fun setSplitRatio(value: Float) {
+        splitRatio = value.coerceIn(MIN_RATIO, 1f - MIN_RATIO)
+        (binding.paneAContainer.layoutParams as? LinearLayout.LayoutParams)?.weight = splitRatio
+        (binding.paneBContainer.layoutParams as? LinearLayout.LayoutParams)?.weight = 1f - splitRatio
+        binding.splitContainer.requestLayout()
+    }
+
+    private fun saveSplitRatio() {
+        prefs.edit().putFloat(KEY_RATIO, splitRatio).apply()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
@@ -791,6 +847,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         const val PREFS = "ui_state"
         const val KEY_SPLIT = "split_enabled"
         const val KEY_STACKED = "split_stacked"
+        const val KEY_RATIO = "split_ratio"
+        const val MIN_RATIO = 0.2f
+        const val DIVIDER_DP = 14
         const val KEY_TABS = "tabs"
         const val KEY_SLOT_A = "slot_a"
         const val KEY_SLOT_B = "slot_b"

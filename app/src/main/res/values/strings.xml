@@ -145,4 +145,5 @@
     <!-- Placeholders for features added in later steps -->
     <string name="coming_in_step">%1$s arrives in Step %2$d</string>
     <string name="cd_hide_toolbar">Hide toolbar</string>
+    <string name="split_resize">Drag to resize split view</string>
 </resources>
