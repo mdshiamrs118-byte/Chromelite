@@ -24,6 +24,10 @@
         <item name="android:textColorPrimary">@color/chrome_text_primary</item>
         <item name="android:textColorSecondary">@color/chrome_text_secondary</item>
         <item name="android:textColorHint">@color/chrome_text_secondary</item>
+
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.ChromeLite.Dialog</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="snackbarStyle">@style/Widget.ChromeLite.Snackbar</item>
     </style>
 
 </resources>

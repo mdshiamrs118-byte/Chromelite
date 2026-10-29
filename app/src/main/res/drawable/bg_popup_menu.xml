@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background of the small system-style popup menus (download item menu etc.) -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetBottom="6dp"
+    android:insetLeft="6dp"
+    android:insetRight="6dp"
+    android:insetTop="6dp">
+    <shape android:shape="rectangle">
+        <solid android:color="@color/chrome_surface_elevated" />
+        <corners android:radius="16dp" />
+        <stroke
+            android:width="1dp"
+            android:color="@color/chrome_divider" />
+    </shape>
+</inset>

@@ -12,4 +12,6 @@
     <color name="chrome_secure">#81C995</color>
     <color name="chrome_insecure">#F28B82</color>
     <color name="chrome_progress">#8AB4F8</color>
+    <color name="chrome_surface_elevated">#2D2E31</color>
+    <color name="chrome_snackbar_bg">#E8EAED</color>
 </resources>

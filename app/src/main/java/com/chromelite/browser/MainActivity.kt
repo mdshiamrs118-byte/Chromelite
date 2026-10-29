@@ -6,9 +6,7 @@ import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
-import android.view.Gravity
 import android.view.KeyEvent
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -24,7 +22,6 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.widget.ImageViewCompat
@@ -46,6 +43,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private lateinit var downloads: DownloadController
     private lateinit var clearDataDialog: ClearDataDialog
     private lateinit var tabSwitcher: TabSwitcher
+    private val mainMenu by lazy { MainMenu(this) }
 
     private var fileCallback: ValueCallback<Array<Uri>>? = null
 
@@ -638,47 +636,61 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     private fun buildOverflowMenu(anchor: View, bookmarked: Boolean) {
-        val popup = PopupMenu(this, anchor, Gravity.END)
-        popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
+        val canBookmark = UrlUtils.isWebUrl(activePane.url)
+        val desktop = BrowserSettings.desktopSite(this)
+        val profileName = profiles.resolve(activePane.profileId).name
 
-        popup.menu.findItem(R.id.action_bookmark_toggle).apply {
-            setTitle(if (bookmarked) R.string.bookmark_remove else R.string.bookmark_add)
-            isEnabled = UrlUtils.isWebUrl(activePane.url)
-        }
-        popup.menu.findItem(R.id.action_desktop_site).isChecked = BrowserSettings.desktopSite(this)
+        val quick = listOf(
+            MainMenu.Item(R.drawable.ic_arrow_forward, getString(R.string.menu_forward), activePane.webView.canGoForward()) {
+                activePane.webView.goForward()
+            },
+            MainMenu.Item(R.drawable.ic_refresh, getString(R.string.menu_refresh)) { activePane.reload() },
+            MainMenu.Item(
+                if (bookmarked) R.drawable.ic_star else R.drawable.ic_star_border,
+                getString(if (bookmarked) R.string.bookmark_remove else R.string.bookmark_add),
+                canBookmark
+            ) { toggleBookmark() },
+            MainMenu.Item(R.drawable.ic_share, getString(R.string.menu_share)) { shareCurrentPage() }
+        )
 
-        popup.menu.findItem(R.id.action_profile).title =
-            getString(R.string.menu_profile, profiles.resolve(activePane.profileId).name)
-        popup.menu.findItem(R.id.action_forward).isEnabled = activePane.webView.canGoForward()
-        popup.menu.findItem(R.id.action_split).isChecked = splitEnabled
-        popup.menu.findItem(R.id.action_split_orientation).apply {
-            isEnabled = splitEnabled
-            setTitle(if (splitStacked) R.string.split_layout_stacked else R.string.split_layout_side)
-        }
-
-        popup.setOnMenuItemClickListener { onMenuItem(it) }
-        popup.show()
-    }
-
-    private fun onMenuItem(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.action_profile -> profileDialogs.showSwitcher()
-            R.id.action_forward -> activePane.webView.goForward()
-            R.id.action_refresh -> activePane.reload()
-            R.id.action_split -> toggleSplit()
-            R.id.action_new_tab -> newTab()
-            R.id.action_split_orientation -> toggleSplitOrientation()
-            R.id.action_share -> shareCurrentPage()
-            R.id.action_bookmark_toggle -> toggleBookmark()
-            R.id.action_find -> openFind()
-            R.id.action_desktop_site -> toggleDesktopSite()
-            R.id.action_bookmarks -> openLibrary(LibraryActivity.MODE_BOOKMARKS)
-            R.id.action_history -> openLibrary(LibraryActivity.MODE_HISTORY)
-            R.id.action_downloads -> downloads.openDownloads()
-            R.id.action_clear_data -> clearDataDialog.show()
-            R.id.action_settings -> BrowserSettings.showDialog(this) { applySettingsToPanes(reload = false) }
-        }
-        return true
+        val groups = listOf(
+            listOf(
+                MainMenu.Item(R.drawable.ic_person, getString(R.string.menu_profile, profileName)) {
+                    profileDialogs.showSwitcher()
+                },
+                MainMenu.Item(R.drawable.ic_add, getString(R.string.tab_new)) { newTab() }
+            ),
+            listOf(
+                MainMenu.Item(R.drawable.ic_split, getString(R.string.menu_split_view), checked = splitEnabled) {
+                    toggleSplit()
+                },
+                MainMenu.Item(
+                    R.drawable.ic_swap,
+                    getString(if (splitStacked) R.string.split_layout_stacked else R.string.split_layout_side),
+                    splitEnabled
+                ) { toggleSplitOrientation() },
+                MainMenu.Item(R.drawable.ic_search, getString(R.string.menu_find)) { openFind() },
+                MainMenu.Item(R.drawable.ic_desktop, getString(R.string.menu_desktop_site), checked = desktop) {
+                    toggleDesktopSite()
+                }
+            ),
+            listOf(
+                MainMenu.Item(R.drawable.ic_bookmark, getString(R.string.menu_bookmarks)) {
+                    openLibrary(LibraryActivity.MODE_BOOKMARKS)
+                },
+                MainMenu.Item(R.drawable.ic_history, getString(R.string.menu_history)) {
+                    openLibrary(LibraryActivity.MODE_HISTORY)
+                },
+                MainMenu.Item(R.drawable.ic_download, getString(R.string.menu_downloads)) { downloads.openDownloads() }
+            ),
+            listOf(
+                MainMenu.Item(R.drawable.ic_delete, getString(R.string.menu_clear_data)) { clearDataDialog.show() },
+                MainMenu.Item(R.drawable.ic_settings, getString(R.string.menu_settings)) {
+                    BrowserSettings.showDialog(this) { applySettingsToPanes(reload = false) }
+                }
+            )
+        )
+        mainMenu.show(anchor, quick, groups)
     }
 
     private fun shareCurrentPage() {
