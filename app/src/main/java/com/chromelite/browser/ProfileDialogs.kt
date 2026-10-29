@@ -19,17 +19,14 @@ class ProfileDialogs(
         /** Profile of the pane the toolbar is currently showing. */
         fun currentProfileId(): String
 
-        /** Profiles that are bound to a visible, running pane. They cannot be deleted. */
+        /** Profiles that still have open tabs. They cannot be deleted. */
         fun profileIdsInUse(): Set<String>
 
         /** A live WebView using this profile (to also empty its cache), if any. */
         fun webViewFor(profileId: String): WebView?
 
-        /** Moves the current pane to another profile. */
-        fun switchCurrentPane(profileId: String)
-
-        /** Lets the activity release a hidden pane that still holds the profile. */
-        fun releaseHiddenPane(profileId: String)
+        /** Opens the current page in a NEW tab bound to [profileId]; the old tab stays as it is. */
+        fun openInProfile(profileId: String)
 
         /** Names or colors changed; re-draw the toolbar. */
         fun profilesChanged()
@@ -54,10 +51,42 @@ class ProfileDialogs(
         MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.profiles_switch_title)
             .setItems(labels.toTypedArray()) { _, which ->
-                host.switchCurrentPane(profiles[which].id)
+                host.openInProfile(profiles[which].id)
             }
             .setNeutralButton(R.string.profiles_new) { _, _ -> promptCreate() }
             .setNegativeButton(R.string.profiles_manage) { _, _ -> showManage() }
+            .show()
+    }
+
+    /**
+     * Lets the user choose a profile for something new (a tab). With isolation unavailable there is
+     * only the default profile, so it is returned straight away.
+     */
+    fun pickProfile(titleRes: Int, onPicked: (String) -> Unit) {
+        if (!manager.isSupported) {
+            onPicked(manager.default.id)
+            return
+        }
+        val profiles = manager.all()
+        val labels = profiles.map { it.name } + activity.getString(R.string.profiles_new_plus)
+        MaterialAlertDialogBuilder(activity)
+            .setTitle(titleRes)
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < profiles.size) {
+                    onPicked(profiles[which].id)
+                } else {
+                    promptName(R.string.profiles_new, "") { name ->
+                        val created = manager.create(name)
+                        if (created == null) {
+                            toast(R.string.profiles_create_failed)
+                        } else {
+                            host.profilesChanged()
+                            onPicked(created.id)
+                        }
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
@@ -94,7 +123,7 @@ class ProfileDialogs(
                 toast(R.string.profiles_create_failed)
             } else {
                 host.profilesChanged()
-                host.switchCurrentPane(created.id)
+                host.openInProfile(created.id)
             }
         }
     }
@@ -127,7 +156,6 @@ class ProfileDialogs(
             .setTitle(activity.getString(R.string.profiles_delete_title, profile.name))
             .setMessage(R.string.profiles_delete_message)
             .setPositiveButton(R.string.profiles_delete) { _, _ ->
-                host.releaseHiddenPane(profile.id)
                 if (manager.delete(profile.id)) {
                     host.profilesChanged()
                 } else {

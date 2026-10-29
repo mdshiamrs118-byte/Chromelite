@@ -4,6 +4,9 @@
         android:id="@+id/action_profile"
         android:title="@string/menu_profile" />
     <item
+        android:id="@+id/action_new_tab"
+        android:title="@string/tab_new" />
+    <item
         android:id="@+id/action_bookmark_toggle"
         android:title="@string/bookmark_add" />
     <item

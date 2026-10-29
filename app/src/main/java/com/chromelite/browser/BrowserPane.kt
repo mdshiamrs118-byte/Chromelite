@@ -32,7 +32,6 @@ class BrowserPane(
     val webView: WebView,
     /** Wraps [webView]; provides pull-to-refresh. */
     val swipe: SwipeRefreshLayout,
-    val indicator: View,
     /** Profile this WebView was bound to (fixed for the life of the WebView). */
     val profileId: String,
     private val listener: Listener
@@ -266,10 +265,34 @@ class BrowserPane(
         }
     }
 
-    fun load(target: String) = webView.loadUrl(target)
+    /** Address a restored (background) tab will load the first time it is shown. */
+    private var pendingUrl: String? = null
+
+    /** Registers a tab without loading it yet; [loadIfPending] does the loading once it is on screen. */
+    fun restore(address: String, savedTitle: String) {
+        pendingUrl = address
+        url = address
+        title = savedTitle
+    }
+
+    fun loadIfPending() {
+        pendingUrl?.let {
+            pendingUrl = null
+            webView.loadUrl(it)
+        }
+    }
+
+    fun load(target: String) {
+        pendingUrl = null
+        webView.loadUrl(target)
+    }
 
     fun reload() {
-        if (url.isBlank()) load(UrlUtils.HOME) else webView.reload()
+        when {
+            pendingUrl != null -> loadIfPending()
+            url.isBlank() -> load(UrlUtils.HOME)
+            else -> webView.reload()
+        }
     }
 
     fun stop() {

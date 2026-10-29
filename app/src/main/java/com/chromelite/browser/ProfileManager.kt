@@ -33,7 +33,7 @@ data class BrowserProfile(val id: String, val name: String, val color: Int) {
  *
  * A profile must be attached to a WebView before that WebView loads anything and cannot be
  * changed afterwards, so switching a pane's profile means building a fresh WebView
- * (see MainActivity.switchProfile).
+ * (MainActivity.openInProfile opens the page in a new tab instead).
  */
 class ProfileManager private constructor(context: Context) {
 

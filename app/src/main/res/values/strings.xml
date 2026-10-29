@@ -38,7 +38,7 @@
     <string name="cd_profile">Switch profile</string>
     <string name="menu_profile">Profile: %1$s</string>
     <string name="profile_auto_name">Profile 2</string>
-    <string name="profiles_switch_title">Browse as</string>
+    <string name="profiles_switch_title">Open this page in…</string>
     <string name="profiles_new">New profile</string>
     <string name="profiles_manage">Manage</string>
     <string name="profiles_rename">Rename</string>
@@ -51,7 +51,7 @@
     <string name="profiles_cleared">Profile data cleared</string>
     <string name="profiles_delete_title">Delete \"%1$s\"?</string>
     <string name="profiles_delete_message">Permanently removes this profile with all of its logins, cookies and site data.</string>
-    <string name="profiles_delete_in_use">This profile is open in a pane. Switch that pane to another profile first.</string>
+    <string name="profiles_delete_in_use">This profile still has open tabs. Close them first.</string>
     <string name="profiles_delete_failed">Could not delete the profile</string>
     <string name="profiles_unavailable_title">Separate profiles unavailable</string>
     <string name="profiles_unavailable_message">Isolated profiles need a newer Android System WebView. Update \"Android System WebView\" (and Chrome) in the Play Store, then restart the app. Until then every page shares one session.</string>
@@ -124,6 +124,23 @@
     <string name="settings_pull_on">Pull to refresh: on</string>
     <string name="settings_pull_off">Pull to refresh: off</string>
     <string name="file_chooser_failed">Could not open the file picker</string>
+
+    <!-- Tabs -->
+    <string name="tabs_title">Tabs (%1$d)</string>
+    <string name="tab_new">New tab</string>
+    <string name="tab_close">Close tab</string>
+    <string name="dialog_close">Close</string>
+    <string name="tab_pane_n">pane %1$d</string>
+    <string name="tabs_limit">Too many tabs open (max %1$d). Close one first.</string>
+    <string name="split_pick_title">Show in split view</string>
+    <string name="split_new_tab">+ New tab…</string>
+    <string name="split_toggle_on">Split view</string>
+    <string name="split_toggle_off">Close split</string>
+    <string name="open_new_tab_title">Open new tab in…</string>
+    <string name="profiles_new_plus">+ New profile…</string>
+
+    <string name="tab_opened_in_profile">Opened in a new tab · %1$s</string>
+    <string name="tab_previous">Previous tab</string>
 
     <!-- Placeholders for features added in later steps -->
     <string name="coming_in_step">%1$s arrives in Step %2$d</string>
