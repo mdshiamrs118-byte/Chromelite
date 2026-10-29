@@ -146,6 +146,15 @@ class ProfileManager private constructor(context: Context) {
      * Pass a WebView that uses the profile to also empty its HTTP cache.
      */
     fun clearData(id: String, webView: WebView? = null) {
+        clearSiteData(id)
+        webView?.apply {
+            clearCache(true)
+            clearFormData()
+        }
+    }
+
+    /** Cookies, Web Storage (localStorage, IndexedDB...) and geolocation permissions of one profile. */
+    fun clearSiteData(id: String) {
         val cookies = cookieManager(id)
         cookies.removeAllCookies(null)
         cookies.flush()
@@ -159,10 +168,6 @@ class ProfileManager private constructor(context: Context) {
         } else {
             WebStorage.getInstance().deleteAllData()
             GeolocationPermissions.getInstance().clearAll()
-        }
-        webView?.apply {
-            clearCache(true)
-            clearFormData()
         }
     }
 

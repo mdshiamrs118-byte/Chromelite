@@ -57,6 +57,74 @@
     <string name="profiles_unavailable_message">Isolated profiles need a newer Android System WebView. Update \"Android System WebView\" (and Chrome) in the Play Store, then restart the app. Until then every page shares one session.</string>
     <string name="profiles_split_shared_notice">Both panes share one session. Update Android System WebView for separate profiles.</string>
 
+    <!-- Downloads -->
+    <string name="dl_settings_title">Download settings</string>
+    <string name="dl_dest_public">Downloads folder</string>
+    <string name="dl_dest_app">%1$s folder (app storage)</string>
+    <string name="dl_settings_action">Settings</string>
+    <string name="dl_permission_denied">Storage permission denied. Save to the app folder instead?</string>
+    <string name="dl_started">Downloading %1$s</string>
+    <string name="dl_view">View</string>
+    <string name="dl_unsupported">This kind of link cannot be downloaded</string>
+    <string name="dl_source_data">Page data</string>
+    <string name="dl_starting">Starting…</string>
+    <string name="dl_complete">Download complete · %1$s</string>
+    <string name="dl_failed">Failed: %1$s</string>
+    <string name="dl_canceled">Canceled</string>
+    <string name="dl_cancel">Cancel download</string>
+    <string name="dl_open">Open</string>
+    <string name="dl_remove_from_list">Remove from list</string>
+    <string name="dl_delete_file">Delete file</string>
+    <string name="dl_clear_finished">Clear finished</string>
+    <string name="dl_empty">No downloads yet</string>
+    <string name="dl_file_missing">The file is no longer there</string>
+    <string name="dl_no_app">No app can open this file</string>
+    <string name="dl_channel_progress">Download progress</string>
+    <string name="dl_channel_done">Download results</string>
+    <string name="dl_save_image">Save image</string>
+    <string name="dl_copy_image_address">Copy image address</string>
+    <string name="dl_open_link">Open link</string>
+    <string name="dl_download_link">Download link</string>
+    <string name="dl_copy_link">Copy link address</string>
+    <string name="dl_copied">Copied</string>
+    <plurals name="dl_active">
+        <item quantity="one">Downloading %d file</item>
+        <item quantity="other">Downloading %d files</item>
+    </plurals>
+
+    <!-- Find in page -->
+    <string name="find_hint">Find in page</string>
+    <string name="find_previous">Previous match</string>
+    <string name="find_next">Next match</string>
+    <string name="find_close">Close find</string>
+
+    <!-- Bookmarks / history -->
+    <string name="bookmark_add">Add bookmark</string>
+    <string name="bookmark_remove">Remove bookmark</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_removed">Bookmark removed</string>
+    <string name="library_search_hint">Search</string>
+    <string name="library_delete">Remove</string>
+    <string name="library_no_matches">No matches</string>
+    <string name="history_empty">No history yet</string>
+    <string name="bookmarks_empty">No bookmarks yet</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_clear_title">Clear history?</string>
+    <string name="history_clear_message">Removes the browsing history of this profile.</string>
+
+    <!-- Clear browsing data -->
+    <string name="clear_history">Browsing history</string>
+    <string name="clear_site_data">Cookies and site data</string>
+    <string name="clear_cache">Cached images and files</string>
+    <string name="clear_this_profile">Clear (%1$s)</string>
+    <string name="clear_all_profiles">All profiles</string>
+    <string name="clear_done">Browsing data cleared</string>
+
+    <!-- Settings -->
+    <string name="settings_pull_on">Pull to refresh: on</string>
+    <string name="settings_pull_off">Pull to refresh: off</string>
+    <string name="file_chooser_failed">Could not open the file picker</string>
+
     <!-- Placeholders for features added in later steps -->
     <string name="coming_in_step">%1$s arrives in Step %2$d</string>
 </resources>

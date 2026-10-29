@@ -9,11 +9,18 @@ import android.os.Message
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.os.Build
 import android.webkit.SslErrorHandler
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 
 /**
  * One browsing surface: a WebView plus the state the toolbar needs (url, title, progress, security).
@@ -23,6 +30,8 @@ import android.webkit.WebViewClient
  */
 class BrowserPane(
     val webView: WebView,
+    /** Wraps [webView]; provides pull-to-refresh. */
+    val swipe: SwipeRefreshLayout,
     val indicator: View,
     /** Profile this WebView was bound to (fixed for the life of the WebView). */
     val profileId: String,
@@ -35,6 +44,32 @@ class BrowserPane(
 
         /** url / title / progress / loading / security changed. */
         fun onPaneChanged(pane: BrowserPane)
+
+        /** The page started a download (file link, blob:, data:, attachment...). */
+        fun onDownloadRequested(
+            pane: BrowserPane,
+            url: String,
+            userAgent: String?,
+            contentDisposition: String?,
+            mimeType: String?,
+            contentLength: Long
+        )
+
+        /** Long-press on an image or link. [hitType] is a WebView.HitTestResult type. */
+        fun onLongPress(pane: BrowserPane, hitType: Int, target: String)
+
+        /** A page finished loading (used for history). */
+        fun onPageVisited(pane: BrowserPane, url: String, title: String)
+
+        /** Find-in-page result for this pane ([active] is zero-based). */
+        fun onFindResult(pane: BrowserPane, active: Int, total: Int)
+
+        /** The page wants the user to pick files to upload. Return true if a picker was launched. */
+        fun onFileChooser(
+            pane: BrowserPane,
+            callback: ValueCallback<Array<Uri>>,
+            params: WebChromeClient.FileChooserParams
+        ): Boolean
     }
 
     enum class Security { SECURE, INSECURE, NEUTRAL }
@@ -49,6 +84,9 @@ class BrowserPane(
         private set
 
     private var sslError = false
+
+    /** True when the blob helper script runs before page scripts (otherwise it is injected late). */
+    private var blobHookAtDocumentStart = false
 
     val security: Security
         get() = when {
@@ -68,6 +106,7 @@ class BrowserPane(
         }
 
         override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: Bitmap?) {
+            if (!blobHookAtDocumentStart) view?.evaluateJavascript(BlobScripts.HOOK, null)
             url = pageUrl.orEmpty()
             title = ""
             progress = 0
@@ -82,6 +121,7 @@ class BrowserPane(
             progress = 100
             isLoading = false
             changed()
+            if (UrlUtils.isWebUrl(url)) listener.onPageVisited(this@BrowserPane, url, title)
         }
 
         // Also fires for in-page (single-page-app) navigation, so the omnibox stays accurate.
@@ -111,6 +151,12 @@ class BrowserPane(
             title = newTitle.orEmpty()
             changed()
         }
+
+        override fun onShowFileChooser(
+            webView: WebView,
+            filePathCallback: ValueCallback<Array<Uri>>,
+            fileChooserParams: FileChooserParams
+        ): Boolean = listener.onFileChooser(this@BrowserPane, filePathCallback, fileChooserParams)
 
         // target="_blank" / window.open(): load the result in this pane instead of ignoring it.
         override fun onCreateWindow(
@@ -153,20 +199,71 @@ class BrowserPane(
     }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    @Suppress("DEPRECATION") // legacy WebSettings still worth setting on older WebViews
     private fun configure() {
-        // Minimal settings so pages work now; Step 5 does the full WebSettings tuning.
         webView.settings.apply {
+            // --- features pages rely on ---
             javaScriptEnabled = true
             domStorageEnabled = true
+            databaseEnabled = true
             setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = true
+            loadsImagesAutomatically = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            cacheMode = WebSettings.LOAD_DEFAULT // honour HTTP caching headers: fastest correct behaviour
+
+            // --- zoom / viewport ---
+            setSupportZoom(true)
+            builtInZoomControls = true
+            displayZoomControls = false // pinch zoom without the on-screen +/- buttons
+            useWideViewPort = true
+
+            // --- hardening: pages must not read local files or app content ---
+            allowFileAccess = false
+            allowContentAccess = false
+            allowFileAccessFromFileURLs = false
+            allowUniversalAccessFromFileURLs = false
+            saveFormData = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
         }
+        webView.overScrollMode = View.OVER_SCROLL_NEVER // the pull-to-refresh spinner replaces the glow
+
+        applyBrowserSettings()
+
+        swipe.setColorSchemeColors(ContextCompat.getColor(webView.context, R.color.chrome_accent))
+        swipe.setOnRefreshListener { reload() }
+        // Only start a refresh when the page itself is scrolled to the very top.
+        swipe.setOnChildScrollUpCallback { _, _ -> webView.scrollY > 0 }
+        webView.setFindListener { active, total, _ -> listener.onFindResult(this, active, total) }
         webView.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) listener.onPaneTouched(this)
             false // never consume: the WebView still handles the touch
         }
         webView.webViewClient = client
         webView.webChromeClient = chrome
+
+        // ---- downloads ----
+        webView.setDownloadListener { downloadUrl, userAgent, disposition, mime, length ->
+            listener.onDownloadRequested(this, downloadUrl, userAgent, disposition, mime, length)
+        }
+        // Bridge used to pull blob: data out of the page (calls need a per-download secret).
+        webView.addJavascriptInterface(BlobBridge(), BlobScripts.BRIDGE_NAME)
+        blobHookAtDocumentStart = runCatching {
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                WebViewCompat.addDocumentStartJavaScript(webView, BlobScripts.HOOK, setOf("*"))
+                true
+            } else {
+                false
+            }
+        }.getOrDefault(false)
+
+        webView.setOnLongClickListener {
+            val hit = webView.hitTestResult
+            val target = hit.extra
+            val handled = hit.type in LONG_PRESS_TYPES && !target.isNullOrBlank()
+            if (handled) listener.onLongPress(this, hit.type, target!!)
+            handled // false keeps the normal long-press behaviour (text selection etc.)
+        }
     }
 
     fun load(target: String) = webView.loadUrl(target)
@@ -185,14 +282,38 @@ class BrowserPane(
 
     fun onPause() = webView.onPause()
 
+    /**
+     * Applies the settings the user can change at runtime: desktop / mobile user agent and
+     * pull-to-refresh. Call again after they change; it does not reload the page.
+     */
+    fun applyBrowserSettings() {
+        val context = webView.context
+        val desktop = BrowserSettings.desktopSite(context)
+        webView.settings.apply {
+            userAgentString = if (desktop) UserAgents.desktop(context) else UserAgents.mobile(context)
+            loadWithOverviewMode = desktop // fit the desktop layout to the screen width
+            layoutAlgorithm = if (desktop) {
+                WebSettings.LayoutAlgorithm.NORMAL
+            } else {
+                WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+            }
+        }
+        swipe.isEnabled = BrowserSettings.pullToRefresh(context)
+    }
+
     fun destroy() {
-        (webView.parent as? ViewGroup)?.removeView(webView)
+        (swipe.parent as? ViewGroup)?.removeView(swipe)
+        swipe.removeAllViews()
         webView.stopLoading()
         webView.webChromeClient = null
+        webView.removeJavascriptInterface(BlobScripts.BRIDGE_NAME)
         webView.destroy()
     }
 
-    private fun changed() = listener.onPaneChanged(this)
+    private fun changed() {
+        if (!isLoading && swipe.isRefreshing) swipe.isRefreshing = false
+        listener.onPaneChanged(this)
+    }
 
     /** Hands mailto:, tel:, intent: ... links to other apps. */
     private fun openExternally(link: String) {
@@ -221,5 +342,11 @@ class BrowserPane(
 
     private companion object {
         val INTERNAL_SCHEMES = setOf("http", "https", "about", "data", "blob", "javascript", "file")
+
+        val LONG_PRESS_TYPES = setOf(
+            WebView.HitTestResult.IMAGE_TYPE,
+            WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE,
+            WebView.HitTestResult.SRC_ANCHOR_TYPE
+        )
     }
 }

@@ -141,6 +141,70 @@
             app:trackThickness="2dp" />
     </LinearLayout>
 
+    <!-- ===== Find in page (hidden until opened from the menu) ===== -->
+    <LinearLayout
+        android:id="@+id/find_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/chrome_toolbar"
+        android:elevation="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/et_find"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:hint="@string/find_hint"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textColor="@color/chrome_text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tv_find_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="4dp"
+            android:textColor="@color/chrome_text_secondary"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/btn_find_prev"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/find_previous"
+            android:src="@drawable/ic_arrow_up"
+            app:tint="@color/chrome_text_primary" />
+
+        <ImageButton
+            android:id="@+id/btn_find_next"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/find_next"
+            android:src="@drawable/ic_arrow_down"
+            app:tint="@color/chrome_text_primary" />
+
+        <ImageButton
+            android:id="@+id/btn_find_close"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/find_close"
+            android:src="@drawable/ic_close"
+            app:tint="@color/chrome_text_primary" />
+    </LinearLayout>
+
     <!--
         ===== Split container =====
         Orientation / sizes are switched in code (side by side <-> top & bottom).
