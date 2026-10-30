@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ChromeLite"
+rootProject.name = "BoxWeb"
 include ':app'

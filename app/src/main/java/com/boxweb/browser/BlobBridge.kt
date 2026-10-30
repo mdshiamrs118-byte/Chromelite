@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.webkit.JavascriptInterface
 import org.json.JSONObject
@@ -34,7 +34,7 @@ class BlobBridge {
 
 object BlobScripts {
 
-    const val BRIDGE_NAME = "ChromeLiteDl"
+    const val BRIDGE_NAME = "BoxWebDl"
 
     /**
      * Runs at document start in every frame. Remembers each Blob handed to URL.createObjectURL and

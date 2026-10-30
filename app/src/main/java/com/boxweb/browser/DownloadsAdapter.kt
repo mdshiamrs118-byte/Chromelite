@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.text.format.DateUtils
 import android.text.format.Formatter
@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.chromelite.browser.databinding.ItemDownloadBinding
+import com.boxweb.browser.databinding.ItemDownloadBinding
 
 class DownloadsAdapter(
     private val onOpen: (DownloadItem) -> Unit,

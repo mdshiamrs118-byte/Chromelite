@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.content.res.ColorStateList
 import android.graphics.Typeface
@@ -9,7 +9,7 @@ import android.widget.BaseAdapter
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
-import com.chromelite.browser.databinding.ItemTabBinding
+import com.boxweb.browser.databinding.ItemTabBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**

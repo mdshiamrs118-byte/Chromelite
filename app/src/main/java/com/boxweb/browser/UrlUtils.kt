@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.net.Uri
 import android.util.Patterns

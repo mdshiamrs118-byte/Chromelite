@@ -1,8 +1,8 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.chromelite.browser.data.BrowserRepository
+import com.boxweb.browser.data.BrowserRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**

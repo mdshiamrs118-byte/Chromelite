@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -8,7 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.chromelite.browser.databinding.ActivityDownloadsBinding
+import com.boxweb.browser.databinding.ActivityDownloadsBinding
 
 /** The download manager screen: live progress, open / share / delete. */
 class DownloadsActivity : AppCompatActivity(), DownloadStore.Listener {

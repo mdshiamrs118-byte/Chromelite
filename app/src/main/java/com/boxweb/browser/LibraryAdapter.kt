@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.text.format.DateUtils
 import android.view.LayoutInflater
@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.chromelite.browser.databinding.ItemLibraryBinding
+import com.boxweb.browser.databinding.ItemLibraryBinding
 
 /** One row of the history / bookmarks list. [time] is the visit time or the time it was saved. */
 data class LibraryRow(val id: Long, val title: String, val url: String, val time: Long)

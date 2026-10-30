@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.content.Context
 import android.content.Intent
@@ -32,8 +32,8 @@ import androidx.core.widget.ImageViewCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.chromelite.browser.data.BrowserRepository
-import com.chromelite.browser.databinding.ActivityMainBinding
+import com.boxweb.browser.data.BrowserRepository
+import com.boxweb.browser.databinding.ActivityMainBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.content.Intent
 import android.os.Bundle
@@ -9,8 +9,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.chromelite.browser.data.BrowserRepository
-import com.chromelite.browser.databinding.ActivityLibraryBinding
+import com.boxweb.browser.data.BrowserRepository
+import com.boxweb.browser.databinding.ActivityLibraryBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch

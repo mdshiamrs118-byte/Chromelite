@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- DayNight follows the system setting; colors switch via values-night/colors.xml -->
-    <style name="Theme.ChromeLite" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.BoxWeb" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/chrome_accent</item>
         <item name="colorPrimaryVariant">@color/chrome_accent</item>
         <item name="colorOnPrimary">@color/chrome_on_accent</item>
@@ -25,9 +25,9 @@
         <item name="android:textColorSecondary">@color/chrome_text_secondary</item>
         <item name="android:textColorHint">@color/chrome_text_secondary</item>
 
-        <item name="materialAlertDialogTheme">@style/ThemeOverlay.ChromeLite.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.BoxWeb.Dialog</item>
         <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
-        <item name="snackbarStyle">@style/Widget.ChromeLite.Snackbar</item>
+        <item name="snackbarStyle">@style/Widget.BoxWeb.Snackbar</item>
     </style>
 
 </resources>

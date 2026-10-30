@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -78,7 +78,7 @@ class DownloadCancelReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_CANCEL = "com.chromelite.browser.action.CANCEL_DOWNLOAD"
+        const val ACTION_CANCEL = "com.boxweb.browser.action.CANCEL_DOWNLOAD"
         const val EXTRA_ID = "download_id"
     }
 }

@@ -1,4 +1,4 @@
-package com.chromelite.browser.data
+package com.boxweb.browser.data
 
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope

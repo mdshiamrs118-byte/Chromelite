@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Also used as the name of the app-specific download folder -->
-    <string name="app_name">ChromeLite</string>
+    <string name="app_name">BoxWeb</string>
 
     <!-- Omnibox -->
     <string name="omnibox_hint">Search or type web address</string>

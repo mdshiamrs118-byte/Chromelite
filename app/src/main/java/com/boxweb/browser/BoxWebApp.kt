@@ -1,9 +1,9 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.app.Application
-import com.chromelite.browser.data.BrowserRepository
+import com.boxweb.browser.data.BrowserRepository
 
-class ChromeLiteApp : Application() {
+class BoxWebApp : Application() {
     override fun onCreate() {
         super.onCreate()
         BrowserRepository.init(this)

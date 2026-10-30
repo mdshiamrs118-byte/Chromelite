@@ -1,4 +1,4 @@
-package com.chromelite.browser
+package com.boxweb.browser
 
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -11,9 +11,9 @@ import android.widget.PopupWindow
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.chromelite.browser.databinding.ItemMenuBinding
-import com.chromelite.browser.databinding.ItemMenuQuickBinding
-import com.chromelite.browser.databinding.PopupMenuBinding
+import com.boxweb.browser.databinding.ItemMenuBinding
+import com.boxweb.browser.databinding.ItemMenuQuickBinding
+import com.boxweb.browser.databinding.PopupMenuBinding
 
 /**
  * The overflow menu: a rounded card with a row of quick actions on top and the grouped list below.

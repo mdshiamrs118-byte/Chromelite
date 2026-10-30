@@ -5,21 +5,43 @@ plugins {
 }
 
 android {
-    namespace 'com.chromelite.browser'
+    namespace 'com.boxweb.browser'
     compileSdk 34         // required by androidx.webkit 1.12 (runtime target stays 29)
 
     defaultConfig {
-        applicationId "com.chromelite.browser"
+        applicationId "com.boxweb.browser"
         minSdk 21
         targetSdk 29          // Android 10
         versionCode 1
         versionName "1.0.0"
     }
 
+    // Release signing. GitHub secrets (KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD)
+    // win when present; otherwise the keystore committed next to this file is used, so every
+    // build is signed with the same key and new APKs install over old ones.
+    signingConfigs {
+        release {
+            def envKeystore = System.getenv("KEYSTORE_FILE")
+            if (envKeystore) {
+                storeFile file(envKeystore)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile file("boxweb-release.jks")
+                storePassword "boxweb-release"
+                keyAlias "boxweb"
+                keyPassword "boxweb-release"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            signingConfig signingConfigs.release
+            // Code shrinking is off on purpose: it is the usual cause of release-only crashes
+            // (reflection in WebView / Room) and cannot be tested without a device.
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -37,6 +59,12 @@ android {
 
     buildFeatures {
         viewBinding true
+    }
+
+    // A release build should not be blocked by lint warnings (e.g. the deliberate old targetSdk).
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
     }
 }
 
