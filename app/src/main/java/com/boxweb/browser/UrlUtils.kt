@@ -6,7 +6,11 @@ import android.util.Patterns
 /** Turns omnibox input into a loadable URL (or a search query) and formats URLs for display. */
 object UrlUtils {
 
-    const val HOME = "https://www.google.com"
+    const val DEFAULT_HOME = "https://www.google.com"
+
+    /** Address of the homepage and of new tabs. Set from the settings at startup. */
+    @Volatile
+    var HOME: String = DEFAULT_HOME
     private const val SEARCH_URL = "https://www.google.com/search?q="
 
     private val EXPLICIT_PREFIXES =

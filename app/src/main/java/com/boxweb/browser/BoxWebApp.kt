@@ -8,6 +8,7 @@ class BoxWebApp : Application() {
         super.onCreate()
         BrowserRepository.init(this)
         AdBlocker.init(this)
+        UrlUtils.HOME = BrowserSettings.homepage(this)
         DownloadStore.init(this)
         DownloadEngine.init(this)
         DownloadNotifications.createChannels(this)

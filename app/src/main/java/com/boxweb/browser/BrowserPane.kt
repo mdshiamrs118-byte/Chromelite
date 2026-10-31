@@ -3,6 +3,7 @@ package com.boxweb.browser
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Message
@@ -94,6 +95,10 @@ class BrowserPane(
 
     private val blocked = AtomicInteger(0)
 
+    /** Small picture of the page for the tab list; null until the tab has been seen. */
+    var thumbnail: Bitmap? = null
+        private set
+
     /** Ad and tracker requests stopped on the current page. */
     val blockedCount: Int get() = blocked.get()
 
@@ -143,7 +148,11 @@ class BrowserPane(
             progress = 100
             isLoading = false
             changed()
-            if (UrlUtils.isWebUrl(url)) listener.onPageVisited(this@BrowserPane, url, title)
+            if (UrlUtils.isWebUrl(url)) {
+                listener.onPageVisited(this@BrowserPane, url, title)
+                runUserScripts()
+                view?.postDelayed({ captureThumbnail() }, THUMBNAIL_DELAY_MS)
+            }
         }
 
         // Also fires for in-page (single-page-app) navigation, so the omnibox stays accurate.
@@ -251,6 +260,9 @@ class BrowserPane(
             allowUniversalAccessFromFileURLs = false
             saveFormData = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            webView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES // lets the phone's password manager fill logins
         }
         webView.overScrollMode = View.OVER_SCROLL_NEVER // the pull-to-refresh spinner replaces the glow
 
@@ -369,6 +381,34 @@ class BrowserPane(
         }
     }
 
+    /** Runs the user scripts that match the current page. */
+    private fun runUserScripts() {
+        val context = webView.context
+        UserScripts.scriptsFor(context, url).forEach {
+            webView.evaluateJavascript(UserScripts.wrap(it), null)
+        }
+    }
+
+    /** Draws the visible page into a small bitmap for the tab list. Skipped for incognito and hidden tabs. */
+    fun captureThumbnail() {
+        if (incognito || !webView.isShown) return
+        val width = webView.width
+        val height = webView.height
+        if (width <= 0 || height <= 0) return
+        runCatching {
+            val scale = THUMBNAIL_WIDTH.toFloat() / width
+            val bitmap = Bitmap.createBitmap(
+                THUMBNAIL_WIDTH,
+                (height * scale).toInt().coerceAtLeast(1),
+                Bitmap.Config.RGB_565
+            )
+            val canvas = Canvas(bitmap)
+            canvas.scale(scale, scale)
+            webView.draw(canvas)
+            thumbnail = bitmap
+        }
+    }
+
     /** Shows the clean reading layout of the page, or puts the normal page back. */
     fun toggleReader() {
         webView.evaluateJavascript(ReaderMode.SCRIPT, null)
@@ -414,6 +454,9 @@ class BrowserPane(
     }
 
     private companion object {
+        const val THUMBNAIL_WIDTH = 160
+        const val THUMBNAIL_DELAY_MS = 700L
+
         val INTERNAL_SCHEMES = setOf("http", "https", "about", "data", "blob", "javascript", "file")
 
         val LONG_PRESS_TYPES = setOf(

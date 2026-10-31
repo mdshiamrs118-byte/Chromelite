@@ -2,7 +2,10 @@ package com.boxweb.browser
 
 import android.app.KeyguardManager
 import android.content.Context
+import android.text.InputType
 import android.webkit.WebSettings
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -19,6 +22,7 @@ object BrowserSettings {
     private const val KEY_POPUPS = "block_popups"
     private const val KEY_TEXT = "text_zoom"
     private const val KEY_LOCK = "app_lock"
+    private const val KEY_HOME = "homepage"
 
     /** Page text sizes (percent) the "Text size" setting steps through. */
     private val TEXT_SIZES = listOf(85, 100, 115, 130, 150)
@@ -70,6 +74,10 @@ object BrowserSettings {
     /** Toolbar at the bottom of the screen (easier to reach with one hand). */
     fun toolbarAtBottom(context: Context): Boolean = prefs(context).getBoolean(KEY_BOTTOM, false)
 
+    /** Where new tabs and the home action go. */
+    fun homepage(context: Context): String =
+        prefs(context).getString(KEY_HOME, null)?.takeIf { it.isNotBlank() } ?: UrlUtils.DEFAULT_HOME
+
     /** Pop-ups opened by a page without a tap are blocked. */
     fun blockPopups(context: Context): Boolean = prefs(context).getBoolean(KEY_POPUPS, true)
 
@@ -91,55 +99,75 @@ object BrowserSettings {
         val off = activity.getString(R.string.state_off)
         fun state(value: Boolean) = if (value) on else off
 
-        val items = arrayOf(
-            activity.getString(if (pull) R.string.settings_pull_on else R.string.settings_pull_off),
-            activity.getString(R.string.settings_search_engine, searchEngineName(activity)),
-            activity.getString(R.string.settings_text_size, zoom),
-            activity.getString(R.string.settings_dark_pages, state(dark)),
-            activity.getString(R.string.settings_popups, state(popups)),
-            activity.getString(R.string.settings_toolbar_bottom, state(bottom)),
-            activity.getString(R.string.settings_app_lock, state(lock)),
-            activity.getString(R.string.settings_export_bookmarks),
-            activity.getString(R.string.settings_import_bookmarks),
-            activity.getString(R.string.dl_settings_title)
-        )
-
         fun toggle(key: String, value: Boolean) {
             prefs(activity).edit().putBoolean(key, value).apply()
             host.onSettingsChanged()
             showDialog(activity, host)
         }
 
+        val entries = listOf<Pair<String, () -> Unit>>(
+            activity.getString(if (pull) R.string.settings_pull_on else R.string.settings_pull_off) to
+                { toggle(KEY_PULL, !pull) },
+            activity.getString(R.string.settings_search_engine, searchEngineName(activity)) to
+                { pickSearchEngine(activity, host) },
+            activity.getString(R.string.settings_homepage, UrlUtils.host(homepage(activity)).ifBlank { homepage(activity) }) to
+                { editHomepage(activity, host) },
+            activity.getString(R.string.settings_text_size, zoom) to {
+                val next = TEXT_SIZES[(TEXT_SIZES.indexOf(zoom) + 1) % TEXT_SIZES.size]
+                prefs(activity).edit().putInt(KEY_TEXT, next).apply()
+                host.onSettingsChanged()
+                showDialog(activity, host)
+            },
+            activity.getString(R.string.settings_dark_pages, state(dark)) to { toggle(KEY_DARK, !dark) },
+            activity.getString(R.string.settings_popups, state(popups)) to { toggle(KEY_POPUPS, !popups) },
+            activity.getString(R.string.settings_toolbar_bottom, state(bottom)) to { toggle(KEY_BOTTOM, !bottom) },
+            activity.getString(R.string.settings_app_lock, state(lock)) to {
+                val keyguard = activity.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                if (!lock && !keyguard.isKeyguardSecure) {
+                    Toast.makeText(activity, R.string.settings_lock_needs_secure, Toast.LENGTH_LONG).show()
+                    showDialog(activity, host)
+                } else {
+                    toggle(KEY_LOCK, !lock)
+                }
+            },
+            activity.getString(R.string.settings_user_scripts, UserScripts.all(activity).size) to
+                { UserScriptsDialog(activity) { host.onSettingsChanged() }.show() },
+            activity.getString(R.string.settings_export_bookmarks) to { host.exportBookmarks() },
+            activity.getString(R.string.settings_import_bookmarks) to { host.importBookmarks() },
+            activity.getString(R.string.dl_settings_title) to { DownloadSettings.showDialog(activity) }
+        )
+
         MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.menu_settings)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> toggle(KEY_PULL, !pull)
-                    1 -> pickSearchEngine(activity, host)
-                    2 -> {
-                        val next = TEXT_SIZES[(TEXT_SIZES.indexOf(zoom) + 1) % TEXT_SIZES.size]
-                        prefs(activity).edit().putInt(KEY_TEXT, next).apply()
-                        host.onSettingsChanged()
-                        showDialog(activity, host)
-                    }
-                    3 -> toggle(KEY_DARK, !dark)
-                    4 -> toggle(KEY_POPUPS, !popups)
-                    5 -> toggle(KEY_BOTTOM, !bottom)
-                    6 -> {
-                        val keyguard = activity.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        if (!lock && !keyguard.isKeyguardSecure) {
-                            Toast.makeText(activity, R.string.settings_lock_needs_secure, Toast.LENGTH_LONG).show()
-                            showDialog(activity, host)
-                        } else {
-                            toggle(KEY_LOCK, !lock)
-                        }
-                    }
-                    7 -> host.exportBookmarks()
-                    8 -> host.importBookmarks()
-                    9 -> DownloadSettings.showDialog(activity)
-                }
-            }
+            .setItems(entries.map { it.first }.toTypedArray()) { _, which -> entries[which].second() }
             .setNegativeButton(R.string.dialog_close, null)
+            .show()
+    }
+
+    private fun editHomepage(activity: AppCompatActivity, host: Host) {
+        val input = EditText(activity).apply {
+            setText(homepage(activity))
+            setSingleLine()
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSelectAllOnFocus(true)
+        }
+        val pad = (20 * activity.resources.displayMetrics.density).toInt()
+        val box = FrameLayout(activity).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        MaterialAlertDialogBuilder(activity)
+            .setTitle(R.string.settings_homepage_title)
+            .setView(box)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val typed = input.text.toString().trim()
+                val value = if (typed.isEmpty()) UrlUtils.DEFAULT_HOME else UrlUtils.resolve(typed)
+                prefs(activity).edit().putString(KEY_HOME, value).apply()
+                UrlUtils.HOME = value
+                host.onSettingsChanged()
+                showDialog(activity, host)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> showDialog(activity, host) }
             .show()
     }
 

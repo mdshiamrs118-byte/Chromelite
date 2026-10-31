@@ -77,6 +77,7 @@ class TabSwitcher(
             val profileColor = if (tab.incognito) ProfileManager.INCOGNITO_COLOR else profile.color
             val isActive = tab === host.activeTab()
 
+            b.ivTabThumb.setImageBitmap(if (tab.incognito) null else tab.thumbnail)
             b.tvTabTitle.text = tab.title.ifBlank { UrlUtils.host(tab.url) }
                 .ifBlank { activity.getString(R.string.pane_untitled) }
             b.tvTabTitle.setTypeface(null, if (isActive) Typeface.BOLD else Typeface.NORMAL)

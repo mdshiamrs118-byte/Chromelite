@@ -34,6 +34,9 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -100,6 +103,10 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     private var splitEnabled = false
     private var fullscreen = false
+
+    /** Recently closed tabs, newest last, for "Reopen closed tab". */
+    private class ClosedTab(val url: String, val title: String, val profileId: String)
+    private val closedTabs = ArrayList<ClosedTab>()
     private var reader: PageReader? = null
 
     // App lock: the phone's own screen lock is asked for after the app has been away for a while.
@@ -331,6 +338,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         if (tab === old || tab !in tabs) return
         closeFind()
 
+        old.captureThumbnail()
         val inA = old === paneA
         val other = if (inA) paneB else paneA
         if (tab === other) {
@@ -360,6 +368,10 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 splitEnabled -> collapseSplitTo(paneB!!)
                 else -> place(true, createTab(profiles.resolve(tab.profileId).id, UrlUtils.HOME, ""))
             }
+        }
+        if (!tab.incognito && UrlUtils.isWebUrl(tab.url)) {
+            closedTabs += ClosedTab(tab.url, tab.title, tab.profileId)
+            if (closedTabs.size > MAX_CLOSED) closedTabs.removeAt(0)
         }
         if (tab.incognito) tab.webView.clearCache(true)
         tab.destroy()
@@ -399,6 +411,40 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     /** Profile for tabs opened from outside the current tab: never the hidden incognito one. */
     private fun normalProfileId(): String = if (activePane.incognito) profiles.default.id else activePane.profileId
+
+    private fun duplicateTab() {
+        val source = activePane
+        val address = source.url.takeIf { UrlUtils.isWebUrl(it) } ?: UrlUtils.HOME
+        if (source.incognito) newIncognitoTab(address) else tryNewTab(source.profileId, address)?.let { showTab(it) }
+    }
+
+    private fun reopenClosedTab() {
+        val last = closedTabs.removeLastOrNull() ?: return
+        tryNewTab(profiles.resolve(last.profileId).id, last.url)?.let { showTab(it) }
+    }
+
+    /** Closes every tab except the one in use. They can be brought back with "Reopen closed tab". */
+    private fun closeOtherTabs() {
+        val keep = activePane
+        tabs.toList().filter { it !== keep }.forEach { closeTab(it) }
+    }
+
+    private fun addToHomeScreen() {
+        val url = activePane.url
+        if (!UrlUtils.isWebUrl(url)) return
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
+            Toast.makeText(this, R.string.shortcut_unsupported, Toast.LENGTH_LONG).show()
+            return
+        }
+        val label = activePane.title.ifBlank { UrlUtils.host(url) }.take(24)
+        val open = Intent(this, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.parse(url))
+        val info = ShortcutInfoCompat.Builder(this, "site-" + url.hashCode())
+            .setShortLabel(label)
+            .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher))
+            .setIntent(open)
+            .build()
+        ShortcutManagerCompat.requestPinShortcut(this, info, null)
+    }
 
     private fun colorOf(tab: BrowserPane): Int =
         if (tab.incognito) ProfileManager.INCOGNITO_COLOR else profiles.resolve(tab.profileId).color
@@ -692,7 +738,11 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     private fun setupToolbar() {
         binding.tvProfile.setOnClickListener { profileDialogs.showSwitcher() }
-        binding.btnTabs.setOnClickListener { tabSwitcher.show() }
+        binding.btnTabs.setOnClickListener {
+            paneA.captureThumbnail()
+            if (splitEnabled) paneB?.captureThumbnail()
+            tabSwitcher.show()
+        }
         binding.btnMenu.setOnClickListener { showOverflowMenu(it) }
         binding.btnToolbarToggle.setOnClickListener { toggleToolbarVisibility() }
     }
@@ -864,7 +914,18 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     profileDialogs.showSwitcher()
                 },
                 MainMenu.Item(R.drawable.ic_add, getString(R.string.tab_new)) { newTab() },
-                MainMenu.Item(R.drawable.ic_incognito, getString(R.string.menu_incognito_tab)) { newIncognitoTab() }
+                MainMenu.Item(R.drawable.ic_incognito, getString(R.string.menu_incognito_tab)) { newIncognitoTab() },
+                MainMenu.Item(R.drawable.ic_copy, getString(R.string.menu_duplicate_tab)) { duplicateTab() },
+                MainMenu.Item(
+                    R.drawable.ic_history,
+                    getString(R.string.menu_reopen_tab),
+                    closedTabs.isNotEmpty()
+                ) { reopenClosedTab() },
+                MainMenu.Item(
+                    R.drawable.ic_close,
+                    getString(R.string.menu_close_others),
+                    tabs.size > 1
+                ) { closeOtherTabs() }
             ),
             listOf(
                 MainMenu.Item(R.drawable.ic_split, getString(R.string.menu_split_view), checked = splitEnabled) {
@@ -895,6 +956,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 ) { toggleReadAloud() },
                 MainMenu.Item(R.drawable.ic_translate, getString(R.string.menu_translate), webPage) { translatePage() },
                 MainMenu.Item(R.drawable.ic_print, getString(R.string.menu_print), webPage) { printPage() },
+                MainMenu.Item(R.drawable.ic_home, getString(R.string.menu_add_home), webPage) { addToHomeScreen() },
                 MainMenu.Item(
                     R.drawable.ic_shield,
                     if (webPage) getString(R.string.menu_block_ads_count, activePane.blockedCount)
@@ -1197,6 +1259,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         const val KEY_URL_A = "url_a"         // single-page state of older versions
         const val KEY_PROFILE_A = "profile_a" // single-page state of older versions
         const val MAX_TABS = 12
+        const val MAX_CLOSED = 15
         const val LOCK_AFTER_MS = 30_000L
     }
 }

@@ -182,4 +182,25 @@
     <string name="tts_nothing">This page has no text to read</string>
     <string name="link_open_new_tab">Open in new tab</string>
     <string name="link_open_incognito">Open in incognito tab</string>
+    <string name="action_save">Save</string>
+    <string name="settings_homepage">Homepage: %1$s</string>
+    <string name="settings_homepage_title">Homepage</string>
+    <string name="settings_user_scripts">User scripts: %1$d</string>
+    <string name="userscripts_title">User scripts</string>
+    <string name="userscripts_empty">Run your own JavaScript on the pages of a site after they load. Use a site like example.com (subdomains too) or * for every site.</string>
+    <string name="userscripts_add">Add script</string>
+    <string name="userscript_edit">Edit</string>
+    <string name="userscript_enable">Turn on</string>
+    <string name="userscript_disable">Turn off</string>
+    <string name="userscript_delete">Delete</string>
+    <string name="userscript_off_prefix">(off)</string>
+    <string name="userscript_name_hint">Name</string>
+    <string name="userscript_site_hint">Site, for example example.com or *</string>
+    <string name="userscript_code_hint">JavaScript</string>
+    <string name="userscript_invalid">Enter a name and some code</string>
+    <string name="menu_duplicate_tab">Duplicate tab</string>
+    <string name="menu_reopen_tab">Reopen closed tab</string>
+    <string name="menu_close_others">Close other tabs</string>
+    <string name="menu_add_home">Add to home screen</string>
+    <string name="shortcut_unsupported">Your launcher does not support home screen shortcuts</string>
 </resources>
