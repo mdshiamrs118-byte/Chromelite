@@ -146,4 +146,23 @@
     <string name="coming_in_step">%1$s arrives in Step %2$d</string>
     <string name="cd_hide_toolbar">Hide toolbar</string>
     <string name="split_resize">Drag to resize split view</string>
+    <string name="state_on">on</string>
+    <string name="state_off">off</string>
+    <string name="settings_search_engine">Search engine: %1$s</string>
+    <string name="settings_search_engine_title">Search engine</string>
+    <string name="settings_dark_pages">Dark mode for web pages: %1$s</string>
+    <string name="settings_toolbar_bottom">Toolbar at the bottom: %1$s</string>
+    <string name="settings_export_bookmarks">Export bookmarks</string>
+    <string name="settings_import_bookmarks">Import bookmarks</string>
+    <string name="bookmarks_exported">Bookmarks exported</string>
+    <string name="bookmarks_export_failed">Could not save the file</string>
+    <string name="bookmarks_imported">%1$d bookmarks added</string>
+    <string name="bookmarks_import_failed">Could not read that file</string>
+    <string name="menu_incognito_tab">New incognito tab</string>
+    <string name="menu_reader">Reader mode</string>
+    <string name="menu_block_ads">Block ads on this site</string>
+    <string name="menu_block_ads_count">Block ads on this site (%1$d)</string>
+    <string name="incognito_name">Incognito</string>
+    <string name="incognito_unsupported">Incognito tabs need a newer Android System WebView. Update it in Play Store.</string>
+    <string name="incognito_opened">Incognito tab: no history, and its cookies are erased when you close it</string>
 </resources>

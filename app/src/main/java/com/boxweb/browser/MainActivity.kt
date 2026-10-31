@@ -36,9 +36,12 @@ import com.boxweb.browser.data.BrowserRepository
 import com.boxweb.browser.databinding.ActivityMainBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.Host, TabSwitcher.Host {
+class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.Host, TabSwitcher.Host,
+    BrowserSettings.Host {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: SharedPreferences
@@ -66,6 +69,16 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             }
         }
 
+    private val exportBookmarksLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) result.data?.data?.let { writeBookmarks(it) }
+        }
+
+    private val importBookmarksLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) result.data?.data?.let { readBookmarks(it) }
+        }
+
     /** Every open tab (each one a WebView bound to exactly one profile). */
     private val tabs = ArrayList<BrowserPane>()
 
@@ -89,11 +102,12 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         profiles = ProfileManager.get(this)
+        profiles.wipeIncognito() // anything a previous run left behind
         profileDialogs = ProfileDialogs(this, profiles, this)
         downloads = DownloadController(this, profiles, binding.root)
         clearDataDialog = ClearDataDialog(
             this, profiles,
-            currentProfile = { profiles.resolve(activePane.profileId) },
+            currentProfile = { profiles.resolve(if (activePane.incognito) null else activePane.profileId) },
             livePanes = { tabs.toList() }
         )
         tabSwitcher = TabSwitcher(this, profiles, this)
@@ -104,6 +118,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
         setupOmnibox()
         setupToolbar()
+        applyToolbarPosition()
         setupFindBar()
         setupSplitDivider()
         setupBackNavigation()
@@ -122,7 +137,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     /** A link from another app opens in its own tab, in the profile of the tab being used. */
     private fun openLink(url: String) {
-        tryNewTab(activePane.profileId, url)?.let { showTab(it) }
+        tryNewTab(normalProfileId(), url)?.let { showTab(it) }
     }
 
     override fun onResume() {
@@ -140,23 +155,27 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     override fun onDestroy() {
+        val hadIncognito = tabs.any { it.incognito }
         tabs.forEach { it.destroy() }
         tabs.clear()
+        if (hadIncognito) profiles.wipeIncognito()
         super.onDestroy()
     }
 
     /** Remembers all tabs (address, title, profile) and which ones are on screen. */
     private fun saveState() {
+        // Incognito tabs are never written down.
+        val saved = tabs.filter { !it.incognito }
         val array = JSONArray()
-        tabs.forEach {
+        saved.forEach {
             array.put(
                 JSONObject().put("url", it.url).put("title", it.title).put("profile", it.profileId)
             )
         }
         prefs.edit()
             .putString(KEY_TABS, array.toString())
-            .putInt(KEY_SLOT_A, tabs.indexOf(paneA))
-            .putInt(KEY_SLOT_B, paneB?.let { tabs.indexOf(it) } ?: -1)
+            .putInt(KEY_SLOT_A, saved.indexOf(paneA))
+            .putInt(KEY_SLOT_B, paneB?.let { saved.indexOf(it) } ?: -1)
             .putString(KEY_ACTIVE, if (activePane === paneB) "B" else "A")
             .putBoolean(KEY_SPLIT, splitEnabled)
             .apply()
@@ -205,7 +224,26 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun createTab(profileId: String, address: String, savedTitle: String): BrowserPane {
         val webView = WebView(this)
         val boundTo = if (profiles.attach(webView, profileId)) profileId else profiles.default.id
+        return buildTab(webView, boundTo, address, savedTitle, incognito = false)
+    }
 
+    /** A private tab on the hidden incognito profile; null when the WebView cannot isolate it. */
+    private fun createIncognitoTab(address: String): BrowserPane? {
+        val webView = WebView(this)
+        if (!profiles.attach(webView, ProfileManager.INCOGNITO_ID)) {
+            webView.destroy()
+            return null
+        }
+        return buildTab(webView, ProfileManager.INCOGNITO_ID, address, "", incognito = true)
+    }
+
+    private fun buildTab(
+        webView: WebView,
+        boundTo: String,
+        address: String,
+        savedTitle: String,
+        incognito: Boolean
+    ): BrowserPane {
         val swipe = SwipeRefreshLayout(this)
         swipe.addView(
             webView,
@@ -214,7 +252,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         // Third-party cookies are needed by many sign-in flows (embedded OAuth frames).
         profiles.cookieManager(boundTo).setAcceptThirdPartyCookies(webView, true)
 
-        val tab = BrowserPane(webView, swipe, boundTo, this)
+        val tab = BrowserPane(webView, swipe, boundTo, this, incognito)
         tab.restore(address, savedTitle)
         tab.onPause() // background until it is placed on screen
         tabs += tab
@@ -288,7 +326,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 else -> place(true, createTab(profiles.resolve(tab.profileId).id, UrlUtils.HOME, ""))
             }
         }
+        if (tab.incognito) tab.webView.clearCache(true)
         tab.destroy()
+        if (tab.incognito && tabs.none { it.incognito }) profiles.wipeIncognito()
 
         if (wasActive) activePane = if (inA) paneA else (paneB ?: paneA)
         applySplitLayout()
@@ -296,11 +336,40 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     override fun newTab() {
-        tryNewTab(activePane.profileId, UrlUtils.HOME)?.let {
+        tryNewTab(normalProfileId(), UrlUtils.HOME)?.let {
             showTab(it)
             binding.etOmnibox.requestFocus()
         }
     }
+
+    /** New tab that leaves no history and erases its cookies and storage when it is closed. */
+    private fun newIncognitoTab() {
+        if (!profiles.incognitoSupported) {
+            Snackbar.make(binding.root, R.string.incognito_unsupported, Snackbar.LENGTH_LONG).show()
+            return
+        }
+        if (tabs.size >= MAX_TABS) {
+            Toast.makeText(this, getString(R.string.tabs_limit, MAX_TABS), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val tab = createIncognitoTab(UrlUtils.HOME)
+        if (tab == null) {
+            Snackbar.make(binding.root, R.string.incognito_unsupported, Snackbar.LENGTH_LONG).show()
+            return
+        }
+        showTab(tab)
+        binding.etOmnibox.requestFocus()
+        Snackbar.make(binding.root, R.string.incognito_opened, Snackbar.LENGTH_LONG).show()
+    }
+
+    /** Profile for tabs opened from outside the current tab: never the hidden incognito one. */
+    private fun normalProfileId(): String = if (activePane.incognito) profiles.default.id else activePane.profileId
+
+    private fun colorOf(tab: BrowserPane): Int =
+        if (tab.incognito) ProfileManager.INCOGNITO_COLOR else profiles.resolve(tab.profileId).color
+
+    private fun profileNameOf(tab: BrowserPane): String =
+        if (tab.incognito) getString(R.string.incognito_name) else profiles.resolve(tab.profileId).name
 
     override fun tabs(): List<BrowserPane> = tabs
 
@@ -343,7 +412,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     /** "Page title · Profile name" - how a tab is listed when choosing one. */
     private fun tabLabel(tab: BrowserPane): String {
         val name = tab.title.ifBlank { UrlUtils.host(tab.url) }.ifBlank { getString(R.string.pane_untitled) }
-        return "$name  \u00B7  ${profiles.resolve(tab.profileId).name}"
+        return "$name  \u00B7  ${profileNameOf(tab)}"
     }
 
     private fun enableSplit(tab: BrowserPane) {
@@ -484,8 +553,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     override fun onLongPress(pane: BrowserPane, hitType: Int, target: String) =
         downloads.onLongPress(pane, hitType, target)
 
-    override fun onPageVisited(pane: BrowserPane, url: String, title: String) =
-        BrowserRepository.recordVisit(pane.profileId, url, title)
+    override fun onPageVisited(pane: BrowserPane, url: String, title: String) {
+        if (!pane.incognito) BrowserRepository.recordVisit(pane.profileId, url, title)
+    }
 
     override fun onFindResult(pane: BrowserPane, active: Int, total: Int) {
         if (pane === activePane && binding.findBar.visibility == View.VISIBLE) {
@@ -582,7 +652,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     private fun navigate(input: String) {
-        activePane.load(UrlUtils.resolve(input))
+        activePane.load(UrlUtils.resolve(input, BrowserSettings.searchUrl(this)))
         binding.etOmnibox.clearFocus()
         activePane.webView.requestFocus()
     }
@@ -647,12 +717,12 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     /** Profile badge in the toolbar and the colored active-pane line, both in the profile's color. */
     private fun renderProfile() = with(binding) {
-        val profile = profiles.resolve(activePane.profileId)
-        tvProfile.text = profile.initial
-        ViewCompat.setBackgroundTintList(tvProfile, ColorStateList.valueOf(profile.color))
+        val pane = activePane
+        tvProfile.text = if (pane.incognito) getString(R.string.incognito_name).take(1) else profiles.resolve(pane.profileId).initial
+        ViewCompat.setBackgroundTintList(tvProfile, ColorStateList.valueOf(colorOf(pane)))
 
-        indicatorA.setBackgroundColor(profiles.resolve(paneA.profileId).color)
-        paneB?.let { indicatorB.setBackgroundColor(profiles.resolve(it.profileId).color) }
+        indicatorA.setBackgroundColor(colorOf(paneA))
+        paneB?.let { indicatorB.setBackgroundColor(colorOf(it)) }
     }
 
     /** Clear (while typing) / stop (while loading) / reload. */
@@ -676,9 +746,40 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun toggleToolbarVisibility() = with(binding) {
         val isVisible = toolbar.visibility == View.VISIBLE
         toolbar.visibility = if (isVisible) View.GONE else View.VISIBLE
-        btnToolbarToggle.setImageResource(
-            if (isVisible) R.drawable.ic_arrow_down else R.drawable.ic_arrow_up
-        )
+        renderToggleIcon()
+    }
+
+    /** The arrow points the way the toolbar will slide: away from the screen edge it sits on. */
+    private fun renderToggleIcon() = with(binding) {
+        val visible = toolbar.visibility == View.VISIBLE
+        val bottom = BrowserSettings.toolbarAtBottom(this@MainActivity)
+        val pointsUp = visible != bottom
+        btnToolbarToggle.setImageResource(if (pointsUp) R.drawable.ic_arrow_up else R.drawable.ic_arrow_down)
+    }
+
+    /** Puts the toolbar (and find bar) at the top or the bottom, as chosen in settings. */
+    private fun applyToolbarPosition() = with(binding) {
+        val bottom = BrowserSettings.toolbarAtBottom(this@MainActivity)
+
+        root.removeView(toolbar)
+        root.removeView(findBar)
+        if (bottom) {
+            root.addView(findBar)
+            root.addView(toolbar)
+        } else {
+            root.addView(toolbar, 0)
+            root.addView(findBar, 1)
+        }
+        // The load bar sits on the edge of the toolbar that faces the page.
+        toolbar.removeView(progress)
+        toolbar.addView(progress, if (bottom) 0 else toolbar.childCount)
+
+        val params = btnToolbarToggle.layoutParams as FrameLayout.LayoutParams
+        params.gravity = (if (bottom) Gravity.BOTTOM else Gravity.TOP) or Gravity.START
+        params.topMargin = if (bottom) 0 else dp(6)
+        params.bottomMargin = if (bottom) dp(6) else 0
+        btnToolbarToggle.layoutParams = params
+        renderToggleIcon()
     }
 
     // ---------------------------------------------------------------- menus
@@ -694,7 +795,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun buildOverflowMenu(anchor: View, bookmarked: Boolean) {
         val canBookmark = UrlUtils.isWebUrl(activePane.url)
         val desktop = BrowserSettings.desktopSite(this)
-        val profileName = profiles.resolve(activePane.profileId).name
+        val profileName = profileNameOf(activePane)
+        val webPage = UrlUtils.isWebUrl(activePane.url)
+        val pageHost = UrlUtils.host(activePane.url).lowercase()
 
         val quick = listOf(
             MainMenu.Item(R.drawable.ic_arrow_forward, getString(R.string.menu_forward), activePane.webView.canGoForward()) {
@@ -714,7 +817,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 MainMenu.Item(R.drawable.ic_person, getString(R.string.menu_profile, profileName)) {
                     profileDialogs.showSwitcher()
                 },
-                MainMenu.Item(R.drawable.ic_add, getString(R.string.tab_new)) { newTab() }
+                MainMenu.Item(R.drawable.ic_add, getString(R.string.tab_new)) { newTab() },
+                MainMenu.Item(R.drawable.ic_incognito, getString(R.string.menu_incognito_tab)) { newIncognitoTab() }
             ),
             listOf(
                 MainMenu.Item(R.drawable.ic_split, getString(R.string.menu_split_view), checked = splitEnabled) {
@@ -728,7 +832,17 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 MainMenu.Item(R.drawable.ic_search, getString(R.string.menu_find)) { openFind() },
                 MainMenu.Item(R.drawable.ic_desktop, getString(R.string.menu_desktop_site), checked = desktop) {
                     toggleDesktopSite()
-                }
+                },
+                MainMenu.Item(R.drawable.ic_reader, getString(R.string.menu_reader), webPage) {
+                    activePane.toggleReader()
+                },
+                MainMenu.Item(
+                    R.drawable.ic_shield,
+                    if (webPage) getString(R.string.menu_block_ads_count, activePane.blockedCount)
+                    else getString(R.string.menu_block_ads),
+                    webPage,
+                    checked = AdBlocker.isEnabledFor(pageHost)
+                ) { toggleAdBlock(pageHost) }
             ),
             listOf(
                 MainMenu.Item(R.drawable.ic_bookmark, getString(R.string.menu_bookmarks)) {
@@ -742,7 +856,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             listOf(
                 MainMenu.Item(R.drawable.ic_delete, getString(R.string.menu_clear_data)) { clearDataDialog.show() },
                 MainMenu.Item(R.drawable.ic_settings, getString(R.string.menu_settings)) {
-                    BrowserSettings.showDialog(this) { applySettingsToPanes(reload = false) }
+                    BrowserSettings.showDialog(this, this)
                 }
             )
         )
@@ -791,6 +905,65 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun toggleDesktopSite() {
         BrowserSettings.setDesktopSite(this, !BrowserSettings.desktopSite(this))
         applySettingsToPanes(reload = true)
+    }
+
+    /** Ad and tracker blocking on or off for one site; the page reloads to apply it. */
+    private fun toggleAdBlock(pageHost: String) {
+        if (pageHost.isBlank()) return
+        AdBlocker.setEnabledFor(pageHost, !AdBlocker.isEnabledFor(pageHost))
+        activePane.reload()
+    }
+
+    // ---------------------------------------------------------------- BrowserSettings.Host
+
+    override fun onSettingsChanged() {
+        applySettingsToPanes(reload = false)
+        applyToolbarPosition()
+    }
+
+    override fun exportBookmarks() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("text/html")
+            .putExtra(Intent.EXTRA_TITLE, "boxweb-bookmarks.html")
+        runCatching { exportBookmarksLauncher.launch(intent) }
+    }
+
+    override fun importBookmarks() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        runCatching { importBookmarksLauncher.launch(intent) }
+    }
+
+    private fun writeBookmarks(uri: Uri) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val html = BookmarkFile.build(BrowserRepository.allBookmarks())
+                    contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use { it.write(html) }
+                }.isSuccess
+            }
+            val message = if (ok) R.string.bookmarks_exported else R.string.bookmarks_export_failed
+            Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun readBookmarks(uri: Uri) {
+        lifecycleScope.launch {
+            val added = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+                    BrowserRepository.importBookmarks(BookmarkFile.parse(text))
+                }.getOrNull()
+            }
+            val message = if (added == null) {
+                getString(R.string.bookmarks_import_failed)
+            } else {
+                getString(R.string.bookmarks_imported, added)
+            }
+            Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+        }
     }
 
     private fun applySettingsToPanes(reload: Boolean) {

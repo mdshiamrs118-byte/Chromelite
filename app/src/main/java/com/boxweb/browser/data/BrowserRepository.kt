@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** History and bookmarks. Writes run on a background scope; callers never block the UI. */
 object BrowserRepository {
@@ -61,6 +62,19 @@ object BrowserRepository {
         scope.launch {
             db.bookmarks().insert(Bookmark(title = title.ifBlank { url }, url = url, createdAt = System.currentTimeMillis()))
         }
+    }
+
+    suspend fun allBookmarks(): List<Bookmark> = withContext(Dispatchers.IO) { db.bookmarks().all() }
+
+    /** Adds (title, url) pairs that are not saved yet. Returns how many were new. */
+    suspend fun importBookmarks(items: List<Pair<String, String>>): Int = withContext(Dispatchers.IO) {
+        var added = 0
+        val now = System.currentTimeMillis()
+        items.forEachIndexed { index, (title, url) ->
+            val row = Bookmark(title = title.ifBlank { url }, url = url, createdAt = now - index)
+            if (db.bookmarks().insert(row) > 0) added++
+        }
+        added
     }
 
     fun removeBookmark(url: String) {

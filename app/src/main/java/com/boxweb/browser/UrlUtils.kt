@@ -18,16 +18,16 @@ object UrlUtils {
         RegexOption.IGNORE_CASE
     )
 
-    fun resolve(input: String): String {
+    fun resolve(input: String, searchUrl: String = SEARCH_URL): String {
         val text = input.trim()
         if (text.isEmpty()) return HOME
 
         if (EXPLICIT_PREFIXES.any { text.startsWith(it, ignoreCase = true) }) return text
-        if (text.any { it.isWhitespace() }) return SEARCH_URL + Uri.encode(text)
+        if (text.any { it.isWhitespace() }) return searchUrl + Uri.encode(text)
         if (LOCAL_HOST.matches(text)) return "http://$text"
         if (Patterns.WEB_URL.matcher(text).matches()) return "https://$text"
 
-        return SEARCH_URL + Uri.encode(text)
+        return searchUrl + Uri.encode(text)
     }
 
     /** "https://www.example.com/path" -> "www.example.com" (falls back to the raw string). */

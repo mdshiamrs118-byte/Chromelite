@@ -14,13 +14,16 @@ import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * One browsing surface: a WebView plus the state the toolbar needs (url, title, progress, security).
@@ -34,7 +37,9 @@ class BrowserPane(
     val swipe: SwipeRefreshLayout,
     /** Profile this WebView was bound to (fixed for the life of the WebView). */
     val profileId: String,
-    private val listener: Listener
+    private val listener: Listener,
+    /** Private tab: no history, nothing saved for the next launch, its own throw-away profile. */
+    val incognito: Boolean = false
 ) {
 
     interface Listener {
@@ -84,6 +89,11 @@ class BrowserPane(
 
     private var sslError = false
 
+    private val blocked = AtomicInteger(0)
+
+    /** Ad and tracker requests stopped on the current page. */
+    val blockedCount: Int get() = blocked.get()
+
     /** True when the blob helper script runs before page scripts (otherwise it is injected late). */
     private var blobHookAtDocumentStart = false
 
@@ -104,7 +114,17 @@ class BrowserPane(
             return true
         }
 
+        override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+            val req = request ?: return null
+            if (req.isForMainFrame) return null
+            val requestHost = req.url.host ?: return null
+            if (!AdBlocker.shouldBlock(requestHost, UrlUtils.host(url).lowercase())) return null
+            blocked.incrementAndGet()
+            return AdBlocker.emptyResponse()
+        }
+
         override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: Bitmap?) {
+            blocked.set(0)
             if (!blobHookAtDocumentStart) view?.evaluateJavascript(BlobScripts.HOOK, null)
             url = pageUrl.orEmpty()
             title = ""
@@ -322,6 +342,28 @@ class BrowserPane(
             }
         }
         swipe.isEnabled = BrowserSettings.pullToRefresh(context)
+        applyDarkMode(BrowserSettings.darkPages(context))
+    }
+
+    /** Dark rendering of light web pages, where the installed WebView supports it. */
+    @Suppress("DEPRECATION")
+    private fun applyDarkMode(enabled: Boolean) {
+        runCatching {
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                WebSettingsCompat.setForceDark(
+                    webView.settings,
+                    if (enabled) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF
+                )
+            }
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, enabled)
+            }
+        }
+    }
+
+    /** Shows the clean reading layout of the page, or puts the normal page back. */
+    fun toggleReader() {
+        webView.evaluateJavascript(ReaderMode.SCRIPT, null)
     }
 
     fun destroy() {

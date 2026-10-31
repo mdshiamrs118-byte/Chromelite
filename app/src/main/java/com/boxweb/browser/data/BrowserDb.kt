@@ -69,6 +69,9 @@ interface BookmarkDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(bookmark: Bookmark): Long
 
+    @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC")
+    suspend fun all(): List<Bookmark>
+
     @Query("SELECT COUNT(*) FROM bookmarks WHERE url = :url")
     suspend fun count(url: String): Int
 

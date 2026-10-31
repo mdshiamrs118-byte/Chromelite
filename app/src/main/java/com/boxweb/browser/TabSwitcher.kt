@@ -73,6 +73,8 @@ class TabSwitcher(
             }
             val tab = getItem(position)
             val profile = profiles.resolve(tab.profileId)
+            val profileName = if (tab.incognito) activity.getString(R.string.incognito_name) else profile.name
+            val profileColor = if (tab.incognito) ProfileManager.INCOGNITO_COLOR else profile.color
             val isActive = tab === host.activeTab()
 
             b.tvTabTitle.text = tab.title.ifBlank { UrlUtils.host(tab.url) }
@@ -81,14 +83,14 @@ class TabSwitcher(
 
             val pane = host.paneNumberOf(tab)
             b.tvTabSub.text = buildString {
-                append(profile.name)
+                append(profileName)
                 val site = UrlUtils.host(tab.url)
                 if (site.isNotBlank()) append("  ·  ").append(site)
                 if (host.splitEnabled() && pane > 0) {
                     append("  ·  ").append(activity.getString(R.string.tab_pane_n, pane))
                 }
             }
-            ViewCompat.setBackgroundTintList(b.vDot, ColorStateList.valueOf(profile.color))
+            ViewCompat.setBackgroundTintList(b.vDot, ColorStateList.valueOf(profileColor))
 
             b.btnTabClose.setOnClickListener {
                 host.closeTab(tab)

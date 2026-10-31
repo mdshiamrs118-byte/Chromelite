@@ -153,6 +153,14 @@ class ProfileManager private constructor(context: Context) {
         }
     }
 
+    /** Incognito needs the Profile API; without it a "private" tab would share the normal cookies. */
+    val incognitoSupported: Boolean get() = isSupported
+
+    /** Throws away everything incognito tabs stored. */
+    fun wipeIncognito() {
+        if (isSupported) clearSiteData(INCOGNITO_ID)
+    }
+
     /** Cookies, Web Storage (localStorage, IndexedDB...) and geolocation permissions of one profile. */
     fun clearSiteData(id: String) {
         val cookies = cookieManager(id)
@@ -204,6 +212,12 @@ class ProfileManager private constructor(context: Context) {
 
         /** Same string as androidx.webkit.Profile.DEFAULT_PROFILE_NAME. */
         const val DEFAULT_ID = "Default"
+
+        /** Hidden profile behind incognito tabs. It is never listed and is wiped after use. */
+        const val INCOGNITO_ID = "incognito"
+
+        /** Badge and indicator color of incognito tabs. */
+        val INCOGNITO_COLOR: Int = Color.parseColor("#3C4043")
 
         val PALETTE = intArrayOf(
             Color.parseColor("#1A73E8"), // blue
