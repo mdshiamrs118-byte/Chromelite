@@ -25,6 +25,7 @@ class LibraryActivity : AppCompatActivity() {
     private lateinit var adapter: LibraryAdapter
 
     private var isHistory = true
+    private var isReading = false
     private var profileId = ProfileManager.DEFAULT_ID
     private var allRows: List<LibraryRow> = emptyList()
     private var query = ""
@@ -34,11 +35,19 @@ class LibraryActivity : AppCompatActivity() {
         binding = ActivityLibraryBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        isHistory = intent.getStringExtra(EXTRA_MODE) != MODE_BOOKMARKS
+        val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_HISTORY
+        isHistory = mode == MODE_HISTORY
+        isReading = mode == MODE_READING
         profileId = intent.getStringExtra(EXTRA_PROFILE) ?: ProfileManager.DEFAULT_ID
         val profileName = intent.getStringExtra(EXTRA_PROFILE_NAME).orEmpty()
 
-        binding.toolbar.title = getString(if (isHistory) R.string.menu_history else R.string.menu_bookmarks)
+        binding.toolbar.title = getString(
+            when {
+                isHistory -> R.string.menu_history
+                isReading -> R.string.menu_reading_list
+                else -> R.string.menu_bookmarks
+            }
+        )
         if (isHistory && profileName.isNotBlank()) binding.toolbar.subtitle = profileName
         binding.toolbar.setNavigationOnClickListener { finish() }
         if (isHistory) {
@@ -55,7 +64,11 @@ class LibraryActivity : AppCompatActivity() {
                 finish()
             },
             onDelete = { row ->
-                if (isHistory) BrowserRepository.deleteHistoryEntry(row.id) else BrowserRepository.deleteBookmark(row.id)
+                when {
+                    isHistory -> BrowserRepository.deleteHistoryEntry(row.id)
+                    isReading -> BrowserRepository.deleteReadingItem(row.id)
+                    else -> BrowserRepository.deleteBookmark(row.id)
+                }
             }
         )
         binding.list.layoutManager = LinearLayoutManager(this)
@@ -69,12 +82,14 @@ class LibraryActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                val flow = if (isHistory) {
-                    BrowserRepository.history(profileId).map { list ->
+                val flow = when {
+                    isHistory -> BrowserRepository.history(profileId).map { list ->
                         list.map { LibraryRow(it.id, it.title, it.url, it.visitedAt) }
                     }
-                } else {
-                    BrowserRepository.bookmarks().map { list ->
+                    isReading -> BrowserRepository.readingList().map { list ->
+                        list.map { LibraryRow(it.id, it.title, it.url, it.createdAt) }
+                    }
+                    else -> BrowserRepository.bookmarks().map { list ->
                         list.map { LibraryRow(it.id, it.title, it.url, it.createdAt) }
                     }
                 }
@@ -97,6 +112,7 @@ class LibraryActivity : AppCompatActivity() {
             when {
                 allRows.isNotEmpty() -> R.string.library_no_matches
                 isHistory -> R.string.history_empty
+                isReading -> R.string.reading_empty
                 else -> R.string.bookmarks_empty
             }
         )
@@ -119,5 +135,6 @@ class LibraryActivity : AppCompatActivity() {
         const val EXTRA_URL = "url"
         const val MODE_HISTORY = "history"
         const val MODE_BOOKMARKS = "bookmarks"
+        const val MODE_READING = "reading"
     }
 }

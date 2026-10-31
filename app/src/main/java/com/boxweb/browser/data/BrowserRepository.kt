@@ -1,6 +1,7 @@
 package com.boxweb.browser.data
 
 import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,6 +13,8 @@ import kotlinx.coroutines.withContext
 object BrowserRepository {
 
     private const val MAX_HISTORY = 5000
+    /** How many of the newest history rows the "most visited" tiles are counted from. */
+    private const val TOP_SITES_SAMPLE = 1000
     /** Reloading the same address within this window updates the row instead of adding a new one. */
     private const val SAME_VISIT_WINDOW_MS = 30 * 60 * 1000L
 
@@ -83,5 +86,38 @@ object BrowserRepository {
 
     fun deleteBookmark(id: Long) {
         scope.launch { db.bookmarks().delete(id) }
+    }
+
+    // ---------------------------------------------------------------- reading list
+
+    fun readingList(): Flow<List<ReadingItem>> = db.reading().observe()
+
+    /** Saves a page to read later; a page that is already saved is left as it is. */
+    fun addToReadingList(title: String, url: String) {
+        scope.launch {
+            db.reading().insert(ReadingItem(title = title.ifBlank { url }, url = url, createdAt = System.currentTimeMillis()))
+        }
+    }
+
+    fun deleteReadingItem(id: Long) {
+        scope.launch { db.reading().delete(id) }
+    }
+
+    // ---------------------------------------------------------------- most visited
+
+    /** Origins ("https://example.com") of the sites this profile visited most, most visited first. */
+    suspend fun topOrigins(profileId: String, limit: Int): List<String> = withContext(Dispatchers.IO) {
+        db.history().recent(profileId, TOP_SITES_SAMPLE)
+            .mapNotNull { entry ->
+                val uri = Uri.parse(entry.url)
+                val host = uri.host
+                if (host == null || uri.scheme == null) null else "${uri.scheme}://$host"
+            }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(limit)
+            .map { it.key }
     }
 }

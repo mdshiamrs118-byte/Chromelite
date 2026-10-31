@@ -6,7 +6,10 @@ import android.util.Patterns
 /** Turns omnibox input into a loadable URL (or a search query) and formats URLs for display. */
 object UrlUtils {
 
-    const val DEFAULT_HOME = "https://www.google.com"
+    /** The built-in new tab page (speed dial). Never sent to the network: [NewTabPage] draws it. */
+    const val NEW_TAB = "boxweb://newtab"
+
+    const val DEFAULT_HOME = NEW_TAB
 
     /** Address of the homepage and of new tabs. Set from the settings at startup. */
     @Volatile
@@ -14,7 +17,7 @@ object UrlUtils {
     private const val SEARCH_URL = "https://www.google.com/search?q="
 
     private val EXPLICIT_PREFIXES =
-        listOf("http://", "https://", "file://", "about:", "data:", "blob:")
+        listOf("http://", "https://", "file://", "about:", "data:", "blob:", "boxweb:")
 
     // localhost and raw IPv4 addresses (optionally with port/path) are served over plain http
     private val LOCAL_HOST = Regex(
@@ -36,7 +39,7 @@ object UrlUtils {
 
     /** "https://www.example.com/path" -> "www.example.com" (falls back to the raw string). */
     fun host(url: String): String {
-        if (url.isBlank()) return ""
+        if (url.isBlank() || url == NEW_TAB) return ""
         return Uri.parse(url).host ?: url
     }
 

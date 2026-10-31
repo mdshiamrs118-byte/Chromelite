@@ -203,4 +203,30 @@
     <string name="menu_close_others">Close other tabs</string>
     <string name="menu_add_home">Add to home screen</string>
     <string name="shortcut_unsupported">Your launcher does not support home screen shortcuts</string>
+
+    <!-- Per-site settings -->
+    <string name="settings_desktop_default">Desktop site by default: %1$s</string>
+    <string name="menu_site_settings">Site settings</string>
+    <string name="site_desktop">Desktop site: %1$s</string>
+    <string name="site_text_size">Text size: %1$s</string>
+    <string name="site_default_value">default (%1$s)</string>
+    <string name="site_reset">Reset this site to the defaults</string>
+
+    <!-- New tab page -->
+    <string name="settings_homepage_newtab">New tab page</string>
+    <string name="settings_homepage_hint">Leave empty for the new tab page</string>
+    <string name="newtab_search">Search</string>
+    <string name="newtab_empty">Bookmarks and the sites you visit most will appear here.</string>
+
+    <!-- Reading list -->
+    <string name="menu_reading_list">Reading list</string>
+    <string name="menu_save_reading">Save to reading list</string>
+    <string name="reading_saved">Saved to reading list</string>
+    <string name="reading_empty">Nothing saved to read later</string>
+    <string name="link_add_reading">Save to reading list</string>
+
+    <!-- QR code -->
+    <string name="menu_share_qr">Share as QR code</string>
+    <string name="qr_title">Scan to open this page</string>
+    <string name="qr_failed">Could not make a QR code for this address</string>
 </resources>

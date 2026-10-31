@@ -25,7 +25,7 @@ object BrowserSettings {
     private const val KEY_HOME = "homepage"
 
     /** Page text sizes (percent) the "Text size" setting steps through. */
-    private val TEXT_SIZES = listOf(85, 100, 115, 130, 150)
+    val TEXT_SIZES = listOf(85, 100, 115, 130, 150)
 
     /** Search engines the omnibox can use: display name and the address a query is appended to. */
     val ENGINES: List<Pair<String, String>> = listOf(
@@ -90,6 +90,7 @@ object BrowserSettings {
     /** Settings list: toggles, pickers and links to the other settings panels. */
     fun showDialog(activity: AppCompatActivity, host: Host) {
         val pull = pullToRefresh(activity)
+        val desktop = desktopSite(activity)
         val dark = darkPages(activity)
         val bottom = toolbarAtBottom(activity)
         val popups = blockPopups(activity)
@@ -110,8 +111,10 @@ object BrowserSettings {
                 { toggle(KEY_PULL, !pull) },
             activity.getString(R.string.settings_search_engine, searchEngineName(activity)) to
                 { pickSearchEngine(activity, host) },
-            activity.getString(R.string.settings_homepage, UrlUtils.host(homepage(activity)).ifBlank { homepage(activity) }) to
+            activity.getString(R.string.settings_homepage, homepageLabel(activity)) to
                 { editHomepage(activity, host) },
+            activity.getString(R.string.settings_desktop_default, state(desktop)) to
+                { toggle(KEY_DESKTOP, !desktop) },
             activity.getString(R.string.settings_text_size, zoom) to {
                 val next = TEXT_SIZES[(TEXT_SIZES.indexOf(zoom) + 1) % TEXT_SIZES.size]
                 prefs(activity).edit().putInt(KEY_TEXT, next).apply()
@@ -144,9 +147,20 @@ object BrowserSettings {
             .show()
     }
 
+    /** "New tab page" for the built-in page, otherwise the site name. */
+    private fun homepageLabel(context: Context): String {
+        val home = homepage(context)
+        return if (home == UrlUtils.NEW_TAB) {
+            context.getString(R.string.settings_homepage_newtab)
+        } else {
+            UrlUtils.host(home).ifBlank { home }
+        }
+    }
+
     private fun editHomepage(activity: AppCompatActivity, host: Host) {
         val input = EditText(activity).apply {
-            setText(homepage(activity))
+            setText(if (homepage(activity) == UrlUtils.NEW_TAB) "" else homepage(activity))
+            hint = activity.getString(R.string.settings_homepage_hint)
             setSingleLine()
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setSelectAllOnFocus(true)

@@ -81,7 +81,10 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1'
 
-    // Room (history + bookmarks)
+    // QR code for "Share as QR code" (pure Java, no camera or network use)
+    implementation 'com.google.zxing:core:3.5.3'
+
+    // Room (history, bookmarks, reading list)
     implementation 'androidx.room:room-runtime:2.5.2'
     implementation 'androidx.room:room-ktx:2.5.2'
     kapt 'androidx.room:room-compiler:2.5.2'

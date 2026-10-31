@@ -17,6 +17,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
@@ -637,6 +638,12 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             val profileId = if (pane.incognito) profiles.default.id else pane.profileId
             extras += getString(R.string.link_open_new_tab) to { tryNewTab(profileId, target)?.let { showTab(it) } }
             extras += getString(R.string.link_open_incognito) to { newIncognitoTab(target) }
+            if (!pane.incognito) {
+                extras += getString(R.string.link_add_reading) to {
+                    BrowserRepository.addToReadingList("", target)
+                    Snackbar.make(binding.root, R.string.reading_saved, Snackbar.LENGTH_SHORT).show()
+                }
+            }
         }
         downloads.onLongPress(pane, hitType, target, extras)
     }
@@ -705,7 +712,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun setupOmnibox() = with(binding) {
         etOmnibox.setOnFocusChangeListener { view, hasFocus ->
             if (hasFocus) {
-                etOmnibox.setText(activePane.url)
+                etOmnibox.setText(if (activePane.isNewTab) "" else activePane.url)
                 etOmnibox.selectAll()
             } else {
                 hideKeyboard(view)
@@ -775,9 +782,10 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
         // Text: URL while editing, page title (or host) otherwise
         if (!focused) {
-            val label = pane.title.ifBlank { UrlUtils.host(pane.url) }
+            val label = if (pane.isNewTab) "" else pane.title.ifBlank { UrlUtils.host(pane.url) }
             if (etOmnibox.text.toString() != label) etOmnibox.setText(label)
         }
+        updateSecureWindow()
 
         // Padlock
         val (icon, color, description) = when {
@@ -809,6 +817,20 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         indicatorB.visibility = if (splitEnabled) View.VISIBLE else View.INVISIBLE
         indicatorA.alpha = if (pane === paneA) 1f else 0.3f
         indicatorB.alpha = if (pane === paneB) 1f else 0.3f
+    }
+
+    /**
+     * While an incognito tab is on screen the window is marked secure: no screenshots, and the
+     * recent-apps preview is blank, so private pages do not leak that way.
+     */
+    private fun updateSecureWindow() {
+        val privateOnScreen = paneA.incognito || (splitEnabled && paneB?.incognito == true)
+        val secure = (window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+        if (privateOnScreen && !secure) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else if (!privateOnScreen && secure) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     /** Profile badge in the toolbar and the colored active-pane line, both in the profile's color. */
@@ -890,10 +912,11 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
     private fun buildOverflowMenu(anchor: View, bookmarked: Boolean) {
         val canBookmark = UrlUtils.isWebUrl(activePane.url)
-        val desktop = BrowserSettings.desktopSite(this)
         val profileName = profileNameOf(activePane)
         val webPage = UrlUtils.isWebUrl(activePane.url)
-        val pageHost = UrlUtils.host(activePane.url).lowercase()
+        val pageHost = if (webPage) UrlUtils.host(activePane.url).lowercase() else ""
+        // Desktop mode of this site (its own choice, or the default); the default when no site is open.
+        val desktop = SiteSettings.desktop(this, pageHost)
 
         val quick = listOf(
             MainMenu.Item(R.drawable.ic_arrow_forward, getString(R.string.menu_forward), activePane.webView.canGoForward()) {
@@ -942,6 +965,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 ) { toggleFullscreen() },
                 MainMenu.Item(R.drawable.ic_desktop, getString(R.string.menu_desktop_site), checked = desktop) {
                     toggleDesktopSite()
+                },
+                MainMenu.Item(R.drawable.ic_tune, getString(R.string.menu_site_settings), webPage) {
+                    openSiteSettings()
                 }
             ),
             listOf(
@@ -957,6 +983,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 MainMenu.Item(R.drawable.ic_translate, getString(R.string.menu_translate), webPage) { translatePage() },
                 MainMenu.Item(R.drawable.ic_print, getString(R.string.menu_print), webPage) { printPage() },
                 MainMenu.Item(R.drawable.ic_home, getString(R.string.menu_add_home), webPage) { addToHomeScreen() },
+                MainMenu.Item(R.drawable.ic_qr, getString(R.string.menu_share_qr), webPage) {
+                    QrShare.show(this, activePane.url)
+                },
                 MainMenu.Item(
                     R.drawable.ic_shield,
                     if (webPage) getString(R.string.menu_block_ads_count, activePane.blockedCount)
@@ -968,6 +997,14 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             listOf(
                 MainMenu.Item(R.drawable.ic_bookmark, getString(R.string.menu_bookmarks)) {
                     openLibrary(LibraryActivity.MODE_BOOKMARKS)
+                },
+                MainMenu.Item(
+                    R.drawable.ic_reading_list,
+                    getString(R.string.menu_save_reading),
+                    webPage && !activePane.incognito
+                ) { saveToReadingList() },
+                MainMenu.Item(R.drawable.ic_reading_list, getString(R.string.menu_reading_list)) {
+                    openLibrary(LibraryActivity.MODE_READING)
                 },
                 MainMenu.Item(R.drawable.ic_history, getString(R.string.menu_history)) {
                     openLibrary(LibraryActivity.MODE_HISTORY)
@@ -984,9 +1021,34 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         mainMenu.show(anchor, quick, groups)
     }
 
+    private fun saveToReadingList() {
+        val url = activePane.url
+        if (!UrlUtils.isWebUrl(url)) return
+        BrowserRepository.addToReadingList(activePane.title, url)
+        Snackbar.make(binding.root, R.string.reading_saved, Snackbar.LENGTH_SHORT).show()
+    }
+
+    private fun openSiteSettings() {
+        val url = activePane.url
+        if (!UrlUtils.isWebUrl(url)) return
+        val host = UrlUtils.host(url)
+        SiteSettingsDialog(this, host) { desktopChanged ->
+            tabs.forEach { it.applyBrowserSettings() }
+            if (desktopChanged) reloadSite(host)
+        }.show()
+    }
+
+    /** Reloads the pages on screen that belong to [host] (a new user agent needs a fresh load). */
+    private fun reloadSite(host: String) {
+        val key = SiteSettings.key(host)
+        listOfNotNull(paneA, if (splitEnabled) paneB else null)
+            .filter { UrlUtils.isWebUrl(it.url) && SiteSettings.key(UrlUtils.host(it.url)) == key }
+            .forEach { it.reload() }
+    }
+
     private fun shareCurrentPage() {
         val url = activePane.url
-        if (url.isBlank()) return
+        if (!UrlUtils.isWebUrl(url)) return
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, url)
@@ -1022,10 +1084,21 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         )
     }
 
-    /** Mobile <-> desktop Chrome user agent, for every pane. Visible pages reload to pick it up. */
+    /**
+     * Mobile <-> desktop Chrome user agent. On a web page this changes only that site (the choice is
+     * remembered); with no site open it changes the default for all sites. Visible pages reload.
+     */
     private fun toggleDesktopSite() {
-        BrowserSettings.setDesktopSite(this, !BrowserSettings.desktopSite(this))
-        applySettingsToPanes(reload = true)
+        val url = activePane.url
+        if (UrlUtils.isWebUrl(url)) {
+            val host = UrlUtils.host(url)
+            SiteSettings.setDesktop(this, host, !SiteSettings.desktop(this, host))
+            tabs.forEach { it.applyBrowserSettings() }
+            reloadSite(host)
+        } else {
+            BrowserSettings.setDesktopSite(this, !BrowserSettings.desktopSite(this))
+            applySettingsToPanes(reload = true)
+        }
     }
 
     private fun translatePage() {

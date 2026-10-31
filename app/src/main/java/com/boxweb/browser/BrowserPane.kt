@@ -95,6 +95,18 @@ class BrowserPane(
 
     private val blocked = AtomicInteger(0)
 
+    // These three must stay above the init block: configure() runs from it and sets appliedDesktop.
+    private var destroyed = false
+
+    /** True from the moment the built-in new tab page is requested until a real web page starts loading. */
+    private var newTabLoading = false
+
+    /** Desktop / mobile mode the WebView's user agent currently reflects. */
+    private var appliedDesktop: Boolean? = null
+
+    /** The built-in new tab page (speed dial) is showing. */
+    val isNewTab: Boolean get() = url == UrlUtils.NEW_TAB
+
     /** Small picture of the page for the tab list; null until the tab has been seen. */
     var thumbnail: Bitmap? = null
         private set
@@ -116,8 +128,23 @@ class BrowserPane(
     private val client = object : WebViewClient() {
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            if (request.url.toString() == UrlUtils.NEW_TAB) {
+                view.post { showNewTab() } // e.g. going back to the new tab page
+                return true
+            }
             val scheme = request.url.scheme?.lowercase()
-            if (scheme in INTERNAL_SCHEMES) return false
+            if (scheme in INTERNAL_SCHEMES) {
+                // A link to a site that wants the other (desktop / mobile) user agent: switch, load it again.
+                if (request.isForMainFrame && request.method == "GET" && (scheme == "http" || scheme == "https")) {
+                    val target = request.url.toString()
+                    if (SiteSettings.desktop(view.context, siteOf(target)) != appliedDesktop) {
+                        applyBrowserSettings(target)
+                        view.post { view.loadUrl(target) }
+                        return true
+                    }
+                }
+                return false
+            }
             openExternally(request.url.toString())
             return true
         }
@@ -134,7 +161,8 @@ class BrowserPane(
         override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: Bitmap?) {
             blocked.set(0)
             if (!blobHookAtDocumentStart) view?.evaluateJavascript(BlobScripts.HOOK, null)
-            url = pageUrl.orEmpty()
+            url = pageUrlOf(pageUrl)
+            applyZoom(url) // the text size can differ per site, and needs no reload
             title = ""
             progress = 0
             isLoading = true
@@ -143,7 +171,7 @@ class BrowserPane(
         }
 
         override fun onPageFinished(view: WebView?, pageUrl: String?) {
-            url = pageUrl ?: url
+            if (pageUrl != null) url = pageUrlOf(pageUrl)
             title = view?.title ?: title
             progress = 100
             isLoading = false
@@ -158,8 +186,15 @@ class BrowserPane(
         // Also fires for in-page (single-page-app) navigation, so the omnibox stays accurate.
         override fun doUpdateVisitedHistory(view: WebView?, visitedUrl: String?, isReload: Boolean) {
             if (!visitedUrl.isNullOrEmpty()) {
-                url = visitedUrl
+                url = pageUrlOf(visitedUrl)
                 changed()
+            }
+        }
+
+        // Going back to the new tab page can ask the WebView for its (non-existent) address: draw it again.
+        override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+            if (request != null && request.isForMainFrame && request.url.toString() == UrlUtils.NEW_TAB) {
+                view?.post { showNewTab() }
             }
         }
 
@@ -317,22 +352,56 @@ class BrowserPane(
     fun loadIfPending() {
         pendingUrl?.let {
             pendingUrl = null
-            webView.loadUrl(it)
+            open(it)
         }
     }
 
     fun load(target: String) {
         pendingUrl = null
-        webView.loadUrl(target)
+        open(target)
+    }
+
+    /** Loads [target] with the settings of its site; the new tab address draws the built-in page instead. */
+    private fun open(target: String) {
+        applyBrowserSettings(target)
+        if (target == UrlUtils.NEW_TAB) {
+            showNewTab()
+        } else {
+            newTabLoading = false
+            webView.loadUrl(target)
+        }
+    }
+
+    private fun showNewTab() {
+        newTabLoading = true
+        url = UrlUtils.NEW_TAB
+        title = ""
+        isLoading = false
+        changed()
+        NewTabPage.load(webView, profileId) { !destroyed }
     }
 
     fun reload() {
         when {
             pendingUrl != null -> loadIfPending()
             url.isBlank() -> load(UrlUtils.HOME)
+            isNewTab -> showNewTab()
             else -> webView.reload()
         }
     }
+
+    /** The address the toolbar should use for what the WebView reports (our own page has no real address). */
+    private fun pageUrlOf(reported: String?): String {
+        val reportedUrl = reported.orEmpty()
+        val ours = reportedUrl == UrlUtils.NEW_TAB ||
+            (newTabLoading && (reportedUrl.isEmpty() || reportedUrl == "about:blank" || reportedUrl.startsWith("data:")))
+        if (UrlUtils.isWebUrl(reportedUrl)) newTabLoading = false
+        return if (ours) UrlUtils.NEW_TAB else reportedUrl
+    }
+
+    /** Host used to look up per-site settings; empty for pages that are not on the web. */
+    private fun siteOf(address: String): String =
+        if (UrlUtils.isWebUrl(address)) UrlUtils.host(address) else ""
 
     fun stop() {
         webView.stopLoading()
@@ -345,16 +414,19 @@ class BrowserPane(
     fun onPause() = webView.onPause()
 
     /**
-     * Applies the settings the user can change at runtime: desktop / mobile user agent and
-     * pull-to-refresh. Call again after they change; it does not reload the page.
+     * Applies the settings the user can change at runtime: desktop / mobile user agent, text size
+     * and pull-to-refresh, using the per-site values of [forUrl] (the current page by default).
+     * Call again after they change; it does not reload the page.
      */
-    fun applyBrowserSettings() {
+    fun applyBrowserSettings(forUrl: String = url) {
         val context = webView.context
-        val desktop = BrowserSettings.desktopSite(context)
+        val site = siteOf(forUrl)
+        val desktop = SiteSettings.desktop(context, site)
+        appliedDesktop = desktop
         webView.settings.apply {
             userAgentString = if (desktop) UserAgents.desktop(context) else UserAgents.mobile(context)
             loadWithOverviewMode = desktop // fit the desktop layout to the screen width
-            textZoom = BrowserSettings.textZoom(context)
+            textZoom = SiteSettings.textZoom(context, site)
             layoutAlgorithm = if (desktop) {
                 WebSettings.LayoutAlgorithm.NORMAL
             } else {
@@ -363,6 +435,11 @@ class BrowserPane(
         }
         swipe.isEnabled = BrowserSettings.pullToRefresh(context)
         applyDarkMode(BrowserSettings.darkPages(context))
+    }
+
+    /** Only the text size of [forUrl]'s site (it can change without reloading). */
+    private fun applyZoom(forUrl: String) {
+        webView.settings.textZoom = SiteSettings.textZoom(webView.context, siteOf(forUrl))
     }
 
     /** Dark rendering of light web pages, where the installed WebView supports it. */
@@ -415,6 +492,7 @@ class BrowserPane(
     }
 
     fun destroy() {
+        destroyed = true
         (swipe.parent as? ViewGroup)?.removeView(swipe)
         swipe.removeAllViews()
         webView.stopLoading()
