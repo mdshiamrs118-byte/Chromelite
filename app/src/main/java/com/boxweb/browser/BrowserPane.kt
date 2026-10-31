@@ -65,6 +65,9 @@ class BrowserPane(
         /** A page finished loading (used for history). */
         fun onPageVisited(pane: BrowserPane, url: String, title: String)
 
+        /** A page tried to open a pop-up without a tap and it was blocked. */
+        fun onPopupBlocked(pane: BrowserPane)
+
         /** Find-in-page result for this pane ([active] is zero-based). */
         fun onFindResult(pane: BrowserPane, active: Int, total: Int)
 
@@ -184,6 +187,10 @@ class BrowserPane(
             isUserGesture: Boolean,
             resultMsg: Message?
         ): Boolean {
+            if (!isUserGesture && BrowserSettings.blockPopups(webView.context)) {
+                listener.onPopupBlocked(this@BrowserPane)
+                return false
+            }
             val msg = resultMsg ?: return false
             val transport = msg.obj as? WebView.WebViewTransport ?: return false
 
@@ -335,6 +342,7 @@ class BrowserPane(
         webView.settings.apply {
             userAgentString = if (desktop) UserAgents.desktop(context) else UserAgents.mobile(context)
             loadWithOverviewMode = desktop // fit the desktop layout to the screen width
+            textZoom = BrowserSettings.textZoom(context)
             layoutAlgorithm = if (desktop) {
                 WebSettings.LayoutAlgorithm.NORMAL
             } else {

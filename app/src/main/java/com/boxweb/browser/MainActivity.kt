@@ -1,11 +1,15 @@
 package com.boxweb.browser
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.annotation.SuppressLint
 import android.view.GestureDetector
 import android.view.Gravity
@@ -15,10 +19,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
+import java.util.Locale
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -28,6 +35,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
@@ -90,6 +99,20 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private lateinit var activePane: BrowserPane
 
     private var splitEnabled = false
+    private var fullscreen = false
+    private var reader: PageReader? = null
+
+    // App lock: the phone's own screen lock is asked for after the app has been away for a while.
+    private var locked = false
+    private var awaitingCredential = false
+    private var stoppedAt = 0L
+    private var lockCover: View? = null
+
+    private val unlockLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            awaitingCredential = false
+            if (result.resultCode == RESULT_OK) unlockNow()
+        }
     private var splitStacked = false // false = side by side, true = top & bottom
     private var splitRatio = 0.5f // share of the split area given to pane A
 
@@ -115,6 +138,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         splitStacked = prefs.getBoolean(KEY_STACKED, false)
         splitRatio = prefs.getFloat(KEY_RATIO, 0.5f).coerceIn(MIN_RATIO, 1f - MIN_RATIO)
         restoreTabs()
+        locked = BrowserSettings.appLock(this)
 
         setupOmnibox()
         setupToolbar()
@@ -127,6 +151,16 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
 
         // Only for a fresh launch: after the system restarts the app it would re-deliver the same link.
         if (savedInstanceState == null) webUrlFrom(intent)?.let { openLink(it) }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        checkLock()
+    }
+
+    override fun onStop() {
+        if (!awaitingCredential) stoppedAt = SystemClock.elapsedRealtime()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -155,6 +189,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     override fun onDestroy() {
+        reader?.shutdown()
         val hadIncognito = tabs.any { it.incognito }
         tabs.forEach { it.destroy() }
         tabs.clear()
@@ -343,7 +378,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     }
 
     /** New tab that leaves no history and erases its cookies and storage when it is closed. */
-    private fun newIncognitoTab() {
+    private fun newIncognitoTab(address: String = UrlUtils.HOME) {
         if (!profiles.incognitoSupported) {
             Snackbar.make(binding.root, R.string.incognito_unsupported, Snackbar.LENGTH_LONG).show()
             return
@@ -352,13 +387,13 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             Toast.makeText(this, getString(R.string.tabs_limit, MAX_TABS), Toast.LENGTH_SHORT).show()
             return
         }
-        val tab = createIncognitoTab(UrlUtils.HOME)
+        val tab = createIncognitoTab(address)
         if (tab == null) {
             Snackbar.make(binding.root, R.string.incognito_unsupported, Snackbar.LENGTH_LONG).show()
             return
         }
         showTab(tab)
-        binding.etOmnibox.requestFocus()
+        if (address == UrlUtils.HOME) binding.etOmnibox.requestFocus()
         Snackbar.make(binding.root, R.string.incognito_opened, Snackbar.LENGTH_LONG).show()
     }
 
@@ -550,8 +585,19 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         contentLength: Long
     ) = downloads.onDownloadRequested(pane, url, userAgent, contentDisposition, mimeType, contentLength)
 
-    override fun onLongPress(pane: BrowserPane, hitType: Int, target: String) =
-        downloads.onLongPress(pane, hitType, target)
+    override fun onLongPress(pane: BrowserPane, hitType: Int, target: String) {
+        val extras = ArrayList<Pair<String, () -> Unit>>()
+        if (hitType == WebView.HitTestResult.SRC_ANCHOR_TYPE && UrlUtils.isWebUrl(target)) {
+            val profileId = if (pane.incognito) profiles.default.id else pane.profileId
+            extras += getString(R.string.link_open_new_tab) to { tryNewTab(profileId, target)?.let { showTab(it) } }
+            extras += getString(R.string.link_open_incognito) to { newIncognitoTab(target) }
+        }
+        downloads.onLongPress(pane, hitType, target, extras)
+    }
+
+    override fun onPopupBlocked(pane: BrowserPane) {
+        if (pane === activePane) Snackbar.make(binding.root, R.string.popup_blocked, Snackbar.LENGTH_SHORT).show()
+    }
 
     override fun onPageVisited(pane: BrowserPane, url: String, title: String) {
         if (!pane.incognito) BrowserRepository.recordVisit(pane.profileId, url, title)
@@ -829,13 +875,26 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     getString(if (splitStacked) R.string.split_layout_stacked else R.string.split_layout_side),
                     splitEnabled
                 ) { toggleSplitOrientation() },
-                MainMenu.Item(R.drawable.ic_search, getString(R.string.menu_find)) { openFind() },
+                MainMenu.Item(
+                    R.drawable.ic_fullscreen,
+                    getString(if (fullscreen) R.string.menu_exit_fullscreen else R.string.menu_fullscreen)
+                ) { toggleFullscreen() },
                 MainMenu.Item(R.drawable.ic_desktop, getString(R.string.menu_desktop_site), checked = desktop) {
                     toggleDesktopSite()
-                },
+                }
+            ),
+            listOf(
+                MainMenu.Item(R.drawable.ic_search, getString(R.string.menu_find)) { openFind() },
                 MainMenu.Item(R.drawable.ic_reader, getString(R.string.menu_reader), webPage) {
                     activePane.toggleReader()
                 },
+                MainMenu.Item(
+                    R.drawable.ic_volume,
+                    getString(if (reader?.isSpeaking() == true) R.string.menu_stop_reading else R.string.menu_read_aloud),
+                    webPage
+                ) { toggleReadAloud() },
+                MainMenu.Item(R.drawable.ic_translate, getString(R.string.menu_translate), webPage) { translatePage() },
+                MainMenu.Item(R.drawable.ic_print, getString(R.string.menu_print), webPage) { printPage() },
                 MainMenu.Item(
                     R.drawable.ic_shield,
                     if (webPage) getString(R.string.menu_block_ads_count, activePane.blockedCount)
@@ -905,6 +964,114 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     private fun toggleDesktopSite() {
         BrowserSettings.setDesktopSite(this, !BrowserSettings.desktopSite(this))
         applySettingsToPanes(reload = true)
+    }
+
+    private fun translatePage() {
+        val url = activePane.url
+        if (!UrlUtils.isWebUrl(url)) return
+        val language = Locale.getDefault().language.ifBlank { "en" }
+        activePane.load("https://translate.google.com/translate?sl=auto&tl=$language&u=${Uri.encode(url)}")
+    }
+
+    /** The system print screen, which also offers "Save as PDF". */
+    private fun printPage() {
+        val name = activePane.title.ifBlank { UrlUtils.host(activePane.url) }.ifBlank { getString(R.string.app_name) }
+        val manager = getSystemService(Context.PRINT_SERVICE) as PrintManager
+        manager.print(name, activePane.webView.createPrintDocumentAdapter(name), PrintAttributes.Builder().build())
+    }
+
+    private fun toggleReadAloud() {
+        val current = reader
+        if (current != null && current.isSpeaking()) {
+            current.stop()
+            return
+        }
+        val script = "(function(){return document.body ? document.body.innerText : '';})()"
+        activePane.webView.evaluateJavascript(script) { raw ->
+            val text = runCatching { (JSONTokener(raw).nextValue() as? String).orEmpty() }.getOrDefault("").trim()
+            if (text.isBlank()) {
+                Toast.makeText(this, R.string.tts_nothing, Toast.LENGTH_SHORT).show()
+            } else {
+                val engine = reader ?: PageReader(this) {
+                    Toast.makeText(this, R.string.tts_failed, Toast.LENGTH_LONG).show()
+                }.also { reader = it }
+                engine.speak(text)
+            }
+        }
+    }
+
+    /** Hides the status and navigation bars; swiping from the screen edge shows them briefly. */
+    private fun toggleFullscreen() {
+        fullscreen = !fullscreen
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (fullscreen) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    // ---------------------------------------------------------------- app lock
+
+    private fun checkLock() {
+        if (!BrowserSettings.appLock(this)) {
+            if (locked) unlockNow()
+            return
+        }
+        if (!locked && stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > LOCK_AFTER_MS) locked = true
+        if (locked) {
+            showLockCover()
+            if (!awaitingCredential) requestUnlock()
+        }
+    }
+
+    private fun showLockCover() {
+        val existing = lockCover
+        if (existing != null) {
+            existing.visibility = View.VISIBLE
+            return
+        }
+        val cover = FrameLayout(this).apply {
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chrome_background))
+            isClickable = true
+            isFocusable = true
+            val button = Button(this@MainActivity).apply {
+                text = getString(R.string.lock_unlock)
+                setOnClickListener { requestUnlock() }
+            }
+            addView(
+                button,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                )
+            )
+        }
+        addContentView(
+            cover,
+            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+        lockCover = cover
+    }
+
+    private fun requestUnlock() {
+        if (awaitingCredential) return
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val intent = keyguard.createConfirmDeviceCredentialIntent(getString(R.string.lock_prompt), null)
+        if (intent == null) { // the phone no longer has a screen lock: nothing to ask for
+            unlockNow()
+            return
+        }
+        awaitingCredential = true
+        runCatching { unlockLauncher.launch(intent) }.onFailure { awaitingCredential = false }
+    }
+
+    private fun unlockNow() {
+        locked = false
+        stoppedAt = 0L
+        lockCover?.visibility = View.GONE
     }
 
     /** Ad and tracker blocking on or off for one site; the page reloads to apply it. */
@@ -1030,5 +1197,6 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         const val KEY_URL_A = "url_a"         // single-page state of older versions
         const val KEY_PROFILE_A = "profile_a" // single-page state of older versions
         const val MAX_TABS = 12
+        const val LOCK_AFTER_MS = 30_000L
     }
 }

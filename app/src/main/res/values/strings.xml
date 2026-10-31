@@ -165,4 +165,21 @@
     <string name="incognito_name">Incognito</string>
     <string name="incognito_unsupported">Incognito tabs need a newer Android System WebView. Update it in Play Store.</string>
     <string name="incognito_opened">Incognito tab: no history, and its cookies are erased when you close it</string>
+    <string name="settings_popups">Block pop-ups: %1$s</string>
+    <string name="settings_text_size">Text size: %1$d%%</string>
+    <string name="settings_app_lock">Lock app with screen lock: %1$s</string>
+    <string name="settings_lock_needs_secure">Set a screen lock (PIN, pattern or fingerprint) in your phone settings first.</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_prompt">Unlock BoxWeb</string>
+    <string name="menu_translate">Translate page</string>
+    <string name="menu_print">Print or save as PDF</string>
+    <string name="menu_read_aloud">Read aloud</string>
+    <string name="menu_stop_reading">Stop reading</string>
+    <string name="menu_fullscreen">Full screen</string>
+    <string name="menu_exit_fullscreen">Exit full screen</string>
+    <string name="popup_blocked">Pop-up blocked</string>
+    <string name="tts_failed">Text-to-speech is not available on this phone</string>
+    <string name="tts_nothing">This page has no text to read</string>
+    <string name="link_open_new_tab">Open in new tab</string>
+    <string name="link_open_incognito">Open in incognito tab</string>
 </resources>

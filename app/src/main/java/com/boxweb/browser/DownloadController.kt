@@ -55,7 +55,12 @@ class DownloadController(
     }
 
     /** Long-press menu for images and links. */
-    fun onLongPress(pane: BrowserPane, hitType: Int, target: String) {
+    fun onLongPress(
+        pane: BrowserPane,
+        hitType: Int,
+        target: String,
+        extras: List<Pair<String, () -> Unit>> = emptyList()
+    ) {
         val isImage = hitType == WebView.HitTestResult.IMAGE_TYPE ||
             hitType == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
         val isLink = hitType == WebView.HitTestResult.SRC_ANCHOR_TYPE
@@ -71,6 +76,7 @@ class DownloadController(
         }
         if (isLink) {
             entries += activity.getString(R.string.dl_open_link) to { pane.load(target) }
+            extras.forEach { entries += it }
             entries += activity.getString(R.string.dl_download_link) to {
                 whenStorageReady { start(pane, target, null, null, null, -1) }
             }
