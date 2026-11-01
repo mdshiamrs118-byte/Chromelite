@@ -213,6 +213,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         saved.forEach {
             array.put(
                 JSONObject().put("url", it.url).put("title", it.title).put("profile", it.profileId)
+                    .put("group", it.group)
             )
         }
         prefs.edit()
@@ -233,7 +234,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     profiles.resolve(o.optString("profile")).id,
                     o.optString("url").ifBlank { UrlUtils.HOME },
                     o.optString("title")
-                )
+                ).group = o.optString("group")
             }
         }
         if (tabs.isEmpty()) {
@@ -636,7 +637,12 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
         val extras = ArrayList<Pair<String, () -> Unit>>()
         if (hitType == WebView.HitTestResult.SRC_ANCHOR_TYPE && UrlUtils.isWebUrl(target)) {
             val profileId = if (pane.incognito) profiles.default.id else pane.profileId
-            extras += getString(R.string.link_open_new_tab) to { tryNewTab(profileId, target)?.let { showTab(it) } }
+            extras += getString(R.string.link_open_new_tab) to {
+                tryNewTab(profileId, target)?.let {
+                    it.group = pane.group // a link opened from a grouped tab joins that group
+                    showTab(it)
+                }
+            }
             extras += getString(R.string.link_open_incognito) to { newIncognitoTab(target) }
             if (!pane.incognito) {
                 extras += getString(R.string.link_add_reading) to {

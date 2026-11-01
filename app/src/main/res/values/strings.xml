@@ -225,6 +225,17 @@
     <string name="reading_empty">Nothing saved to read later</string>
     <string name="link_add_reading">Save to reading list</string>
 
+    <!-- Tab groups -->
+    <string name="tab_group_add">Add to group…</string>
+    <string name="tab_group_remove">Remove from group</string>
+    <string name="tab_group_new">+ New group…</string>
+    <string name="tab_group_new_title">New group</string>
+    <string name="tab_group_name_hint">Group name</string>
+    <string name="tab_group_pick_title">Add to group</string>
+    <string name="tab_group_header">%1$s (%2$d)</string>
+    <string name="tab_group_ungroup">Ungroup tabs</string>
+    <string name="tab_group_close">Close all tabs in this group</string>
+
     <!-- QR code -->
     <string name="menu_share_qr">Share as QR code</string>
     <string name="qr_title">Scan to open this page</string>

@@ -107,6 +107,9 @@ class BrowserPane(
     /** The built-in new tab page (speed dial) is showing. */
     val isNewTab: Boolean get() = url == UrlUtils.NEW_TAB
 
+    /** Name of the tab group this tab belongs to; empty when it is in no group. */
+    var group: String = ""
+
     /** Small picture of the page for the tab list; null until the tab has been seen. */
     var thumbnail: Bitmap? = null
         private set
