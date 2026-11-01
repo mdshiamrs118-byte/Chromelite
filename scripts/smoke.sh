@@ -53,6 +53,7 @@ PY
     adb shell input tap $xy
     return 0
   fi
+  [ "${2:-}" = quiet ] && return 1
   echo "(skip: '$1' not on screen) labels on screen:"
   python3 - <<'PY2'
 import xml.etree.ElementTree as ET
@@ -69,6 +70,29 @@ PY2
 
 back() { adb shell input keyevent KEYCODE_BACK; }
 
+# Screen geometry for scrolling the overflow menu (its list scrolls when it is taller than 60% of the screen).
+size=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1 | tr -d '\r')
+W=${size%x*}; H=${size#*x}
+SX=$((W * 70 / 100)); SY1=$((H * 55 / 100)); SY2=$((H * 20 / 100))
+
+# Taps an entry of the open overflow menu, scrolling the menu until it appears.
+tap_in_menu() {
+  for _ in 1 2 3 4 5; do
+    if tap "$1" quiet; then return 0; fi
+    adb shell input swipe "$SX" "$SY1" "$SX" "$SY2" 300
+    sleep 1
+  done
+  tap "$1" # last try, prints what is on screen
+}
+
+# Back out of whatever opened, and make sure the app is still the one on screen.
+close_and_return() {
+  back
+  sleep 1
+  adb shell am start -n "$PKG/$ACT" >/dev/null
+  sleep 1
+}
+
 # 1. First launch
 adb logcat -c
 adb shell am start -W -n "$PKG/$ACT" >/dev/null
@@ -80,16 +104,14 @@ adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/$ACT" >/dev/null
 check relaunch 10
 
-# 3. Open the overflow menu and a few of its screens
-for item in "Settings" "Reading list" "Saved pages" "Bookmarks" "History" "Downloads"; do
+# 3. Open the overflow menu and use its entries
+for item in "Settings" "Reading list" "Saved pages" "Bookmarks" "History" "Downloads" "New incognito tab" "Duplicate tab"; do
   adb logcat -c
   if tap "More options"; then
     sleep 1
-    if tap "$item"; then
+    if tap_in_menu "$item"; then
       check "menu-$(echo "$item" | tr ' ' '_')" 3
-      back
-      sleep 1
-      back
+      close_and_return
     else
       back
     fi
