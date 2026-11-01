@@ -643,6 +643,14 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     showTab(it)
                 }
             }
+            if (!pane.incognito) {
+                extras += getString(R.string.link_open_other_pane) to {
+                    tryNewTab(profileId, target)?.let {
+                        it.group = pane.group
+                        openInOtherPane(pane, it)
+                    }
+                }
+            }
             extras += getString(R.string.link_open_incognito) to { newIncognitoTab(target) }
             if (!pane.incognito) {
                 extras += getString(R.string.link_add_reading) to {
@@ -965,6 +973,7 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     getString(if (splitStacked) R.string.split_layout_stacked else R.string.split_layout_side),
                     splitEnabled
                 ) { toggleSplitOrientation() },
+                MainMenu.Item(R.drawable.ic_swap, getString(R.string.menu_swap_panes), splitEnabled) { swapPanes() },
                 MainMenu.Item(
                     R.drawable.ic_fullscreen,
                     getString(if (fullscreen) R.string.menu_exit_fullscreen else R.string.menu_fullscreen)
@@ -993,6 +1002,11 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                     QrShare.show(this, activePane.url)
                 },
                 MainMenu.Item(
+                    R.drawable.ic_download_done,
+                    getString(R.string.menu_save_offline),
+                    webPage && !activePane.incognito
+                ) { savePageOffline() },
+                MainMenu.Item(
                     R.drawable.ic_shield,
                     if (webPage) getString(R.string.menu_block_ads_count, activePane.blockedCount)
                     else getString(R.string.menu_block_ads),
@@ -1012,6 +1026,9 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
                 MainMenu.Item(R.drawable.ic_reading_list, getString(R.string.menu_reading_list)) {
                     openLibrary(LibraryActivity.MODE_READING)
                 },
+                MainMenu.Item(R.drawable.ic_download, getString(R.string.menu_saved_pages)) {
+                    OfflinePagesDialog(this) { activePane.loadArchive(OfflinePages.fileOf(this, it)) }.show()
+                },
                 MainMenu.Item(R.drawable.ic_history, getString(R.string.menu_history)) {
                     openLibrary(LibraryActivity.MODE_HISTORY)
                 },
@@ -1025,6 +1042,55 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
             )
         )
         mainMenu.show(anchor, quick, groups)
+    }
+
+    /** Saves the page on screen as a single-file web archive that can be opened without a connection. */
+    private fun savePageOffline() {
+        val pane = activePane
+        val url = pane.url
+        if (!UrlUtils.isWebUrl(url) || pane.incognito) return
+        val dir = OfflinePages.dir(this)
+        if (!dir.isDirectory && !dir.mkdirs()) {
+            Snackbar.make(binding.root, R.string.offline_failed, Snackbar.LENGTH_LONG).show()
+            return
+        }
+        val id = System.currentTimeMillis()
+        val file = java.io.File(dir, "$id.mht")
+        val title = pane.title.ifBlank { UrlUtils.host(url) }
+        pane.webView.saveWebArchive(file.absolutePath, false) { saved ->
+            if (saved != null && file.isFile && file.length() > 0) {
+                OfflinePages.add(this, OfflinePages.Saved(id, title, url, file.name, file.length()))
+                Snackbar.make(binding.root, R.string.offline_saved, Snackbar.LENGTH_SHORT).show()
+            } else {
+                file.delete()
+                Snackbar.make(binding.root, R.string.offline_failed, Snackbar.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Puts the two panes of split view in each other's place. */
+    private fun swapPanes() {
+        val first = paneA
+        val second = paneB ?: return
+        closeFind()
+        place(true, second)
+        place(false, first)
+        render()
+    }
+
+    /** Opens [tab] in the pane opposite [source], starting split view if it is off. */
+    private fun openInOtherPane(source: BrowserPane, tab: BrowserPane) {
+        if (!splitEnabled) {
+            enableSplit(tab)
+            return
+        }
+        val intoA = source === paneB
+        val replaced = if (intoA) paneA else paneB ?: return
+        closeFind()
+        place(intoA, tab)
+        replaced.onPause()
+        activePane = tab
+        render()
     }
 
     private fun saveToReadingList() {

@@ -174,6 +174,7 @@ class BrowserPane(
         }
 
         override fun onPageFinished(view: WebView?, pageUrl: String?) {
+            view?.settings?.allowFileAccess = false // only saved pages needed it, and only to load
             if (pageUrl != null) url = pageUrlOf(pageUrl)
             title = view?.title ?: title
             progress = 100
@@ -196,8 +197,9 @@ class BrowserPane(
 
         // Going back to the new tab page can ask the WebView for its (non-existent) address: draw it again.
         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
-            if (request != null && request.isForMainFrame && request.url.toString() == UrlUtils.NEW_TAB) {
-                view?.post { showNewTab() }
+            if (request != null && request.isForMainFrame) {
+                view?.settings?.allowFileAccess = false
+                if (request.url.toString() == UrlUtils.NEW_TAB) view?.post { showNewTab() }
             }
         }
 
@@ -367,12 +369,31 @@ class BrowserPane(
     /** Loads [target] with the settings of its site; the new tab address draws the built-in page instead. */
     private fun open(target: String) {
         applyBrowserSettings(target)
+        if (target.startsWith("file://", ignoreCase = true)) {
+            // Local pages are only allowed for pages the user saved for offline reading.
+            val saved = OfflinePages.fileFor(webView.context, target)
+            if (saved != null) {
+                loadArchive(saved)
+                return
+            }
+        }
         if (target == UrlUtils.NEW_TAB) {
             showNewTab()
         } else {
             newTabLoading = false
             webView.loadUrl(target)
         }
+    }
+
+    /**
+     * Opens a page saved for offline reading. Local files are normally off limits, so file access is
+     * switched on just for this load and off again as soon as the page has finished (or failed).
+     */
+    fun loadArchive(file: java.io.File) {
+        pendingUrl = null
+        newTabLoading = false
+        webView.settings.allowFileAccess = true
+        webView.loadUrl(Uri.fromFile(file).toString())
     }
 
     private fun showNewTab() {
@@ -389,6 +410,7 @@ class BrowserPane(
             pendingUrl != null -> loadIfPending()
             url.isBlank() -> load(UrlUtils.HOME)
             isNewTab -> showNewTab()
+            url.startsWith("file://", ignoreCase = true) -> open(url)
             else -> webView.reload()
         }
     }

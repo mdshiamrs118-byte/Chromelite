@@ -225,6 +225,21 @@
     <string name="reading_empty">Nothing saved to read later</string>
     <string name="link_add_reading">Save to reading list</string>
 
+    <!-- Offline pages -->
+    <string name="menu_save_offline">Save page for offline</string>
+    <string name="menu_saved_pages">Saved pages</string>
+    <string name="offline_title">Saved pages</string>
+    <string name="offline_saved">Page saved for offline reading</string>
+    <string name="offline_failed">Could not save this page</string>
+    <string name="offline_empty">No saved pages yet</string>
+    <string name="offline_missing">That saved page is no longer on this phone</string>
+    <string name="offline_delete_title">Delete this saved page?</string>
+    <string name="offline_delete">Delete</string>
+
+    <!-- Split view extras -->
+    <string name="link_open_other_pane">Open in other pane</string>
+    <string name="menu_swap_panes">Swap panes</string>
+
     <!-- Tab groups -->
     <string name="tab_group_add">Add to group…</string>
     <string name="tab_group_remove">Remove from group</string>

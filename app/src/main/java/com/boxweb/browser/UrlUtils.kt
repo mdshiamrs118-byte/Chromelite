@@ -39,7 +39,7 @@ object UrlUtils {
 
     /** "https://www.example.com/path" -> "www.example.com" (falls back to the raw string). */
     fun host(url: String): String {
-        if (url.isBlank() || url == NEW_TAB) return ""
+        if (url.isBlank() || url == NEW_TAB || url.startsWith("file://", ignoreCase = true)) return ""
         return Uri.parse(url).host ?: url
     }
 
