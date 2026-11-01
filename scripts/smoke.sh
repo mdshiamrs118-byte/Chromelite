@@ -53,7 +53,17 @@ PY
     adb shell input tap $xy
     return 0
   fi
-  echo "(skip: '$1' not on screen)"
+  echo "(skip: '$1' not on screen) labels on screen:"
+  python3 - <<'PY2'
+import xml.etree.ElementTree as ET
+try:
+    for n in ET.parse("smoke-logs/ui.xml").getroot().iter("node"):
+        t = n.get("text") or n.get("content-desc")
+        if t:
+            print("   -", repr(t))
+except Exception as e:
+    print("   (no dump:", e, ")")
+PY2
   return 1
 }
 
