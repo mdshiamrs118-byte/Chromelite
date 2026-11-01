@@ -401,7 +401,8 @@ class BrowserPane(
         url = UrlUtils.NEW_TAB
         title = ""
         isLoading = false
-        changed()
+        // Not straight away: this can run while the activity is still placing its tabs.
+        webView.post { if (!destroyed) changed() }
         NewTabPage.load(webView, profileId) { !destroyed }
     }
 

@@ -621,7 +621,8 @@ class MainActivity : AppCompatActivity(), BrowserPane.Listener, ProfileDialogs.H
     override fun onPaneTouched(pane: BrowserPane) = setActive(pane)
 
     override fun onPaneChanged(pane: BrowserPane) {
-        if (pane === activePane) render()
+        // A pane can report a change while tabs are still being restored, before one is active.
+        if (::activePane.isInitialized && pane === activePane) render()
     }
 
     override fun onDownloadRequested(
